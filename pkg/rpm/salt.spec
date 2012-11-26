@@ -81,7 +81,7 @@ Salt minion is queried and controlled from the master.
 
 %prep
 %setup -q
-%patch0 -p1 -b .systemd
+
 
 %build
 
