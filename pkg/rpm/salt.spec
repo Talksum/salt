@@ -9,7 +9,7 @@
 
 
 Name: salt
-Version: 0.10.4
+Version: 0.10.5
 Release: 1%{?dist}
 Summary: A parallel remote execution system
 
@@ -81,6 +81,7 @@ Salt minion is queried and controlled from the master.
 
 %prep
 %setup -q
+%patch0 -p1 -b .systemd
 
 %build
 
@@ -178,8 +179,12 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
-* Wed Oct 24 2012 Mike Chesnut <mikec@talksum.com> - 0.10.4-1
-- merge from upstream for 0.10.4 release
+* Mon Nov 26 2012 Mike Chesnut <mikec@talksum.com> - 0.10.5-1
+- merge from upstream for 0.10.5 release
+
+* Tue Oct 24 2012 Clint Savage <herlo1@gmail.com> - 0.10.4-1
+- Moved to upstream release 0.10.4
+- Patched jcollie/systemd-service-status (SALT@GH#2335) (RHBZ#869669)
 
 * Tue Oct 2 2012 Clint Savage <herlo1@gmail.com> - 0.10.3-1
 - Moved to upstream release 0.10.3

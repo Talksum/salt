@@ -2,6 +2,7 @@
 Package support for FreeBSD
 '''
 
+# Import python libs
 import os
 
 
@@ -9,7 +10,7 @@ def _check_pkgng():
     '''
     Looks to see if pkgng is being used by checking if database exists
     '''
-    if os.path.isfile('/var/db/pkg/repo.sqlite'):
+    if os.path.isfile('/var/db/pkg/local.sqlite'):
         return True
     return False
 
@@ -24,7 +25,7 @@ def search(pkg_name):
     '''
     if _check_pkgng():
         res = __salt__['cmd.run']('pkg search {0}'.format(pkg_name))
-        res = [x for x in res.split('\n')]
+        res = [x for x in res.splitlines()]
         return {"Results": res}
 
 
@@ -54,7 +55,12 @@ def available_version(name):
 
         salt '*' pkg.available_version <package name>
     '''
-    pass
+    if _check_pkgng():
+        for line in __salt__['cmd.run']('pkg search -f {0}'.format(name).splitlines()):
+            if line.startswith('Version'):
+                fn, ver = line.split(':', 1)
+                return ver.strip()
+    return ''
 
 
 def version(name):
@@ -108,7 +114,7 @@ def list_pkgs():
     else:
         pkg_command = "pkg_info"
     ret = {}
-    for line in __salt__['cmd.run'](pkg_command).split('\n'):
+    for line in __salt__['cmd.run'](pkg_command).splitlines():
         if not line:
             continue
         comps = line.split(' ')[0].split('-')

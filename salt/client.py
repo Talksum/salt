@@ -28,19 +28,21 @@ The data structure needs to be:
 # small, and only start with the ability to execute salt commands locally.
 # This means that the primary client to build is, the LocalClient
 
+# Import python libs
 import os
-import sys
 import glob
 import time
 import getpass
 
-# Import salt modules
+# Import salt libs
 import salt.config
 import salt.payload
 import salt.utils
 import salt.utils.verify
 import salt.utils.event
+import salt.utils.minions
 from salt.exceptions import SaltInvocationError
+from salt.exceptions import EauthAuthenticationError
 
 # Try to import range from https://github.com/ytoolshed/range
 RANGE = False
@@ -67,8 +69,11 @@ class LocalClient(object):
     '''
     Connect to the salt master via the local server and via root
     '''
-    def __init__(self, c_path='/etc/salt'):
-        self.opts = salt.config.client_config(c_path)
+    def __init__(self, c_path='/etc/salt', mopts=None):
+        if mopts:
+            self.opts - mopts
+        else:
+            self.opts = salt.config.client_config(c_path)
         self.serial = salt.payload.Serial(self.opts)
         self.salt_user = self.__get_user()
         self.key = self.__read_master_key()
@@ -83,7 +88,7 @@ class LocalClient(object):
             if self.opts.get('user', 'root') != 'root':
                 key_user = self.opts.get('user', 'root')
         if key_user.startswith('sudo_'):
-            key_user = 'root'
+            key_user = self.opts.get('user', 'root')
         keyfile = os.path.join(
                 self.opts['cachedir'], '.{0}_key'.format(key_user)
                 )
@@ -91,7 +96,7 @@ class LocalClient(object):
         salt.utils.verify.check_parent_dirs(keyfile, key_user)
 
         try:
-            with open(keyfile, 'r') as KEY:
+            with salt.utils.fopen(keyfile, 'r') as KEY:
                 return KEY.read()
         except (OSError, IOError):
             # Fall back to eauth
@@ -142,9 +147,8 @@ class LocalClient(object):
         '''
         if not pub_data:
             err = ('Failed to authenticate, is this user permitted to execute '
-                   'commands?\n')
-            sys.stderr.write(err)
-            sys.exit(4)
+                   'commands?')
+            raise EauthAuthenticationError(err)
 
         # Failed to connect to the master and send the pub
         if not 'jid' in pub_data or pub_data['jid'] == '0':
@@ -284,7 +288,10 @@ class LocalClient(object):
         else:
             for fn_ret in self.get_iter_returns(pub_data['jid'],
                     pub_data['minions'],
-                    timeout):
+                    timeout or self.opts['timeout'],
+                    tgt,
+                    expr_form,
+                    **kwargs):
                 if not fn_ret:
                     continue
                 yield fn_ret
@@ -400,7 +407,7 @@ class LocalClient(object):
                     while fn_ not in ret:
                         try:
                             check = True
-                            ret_data = self.serial.load(open(retp, 'r'))
+                            ret_data = self.serial.load(salt.utils.fopen(retp, 'r'))
                             if ret_data is None:
                                 # Sometimes the ret data is read at the wrong
                                 # time and returns None, do a quick re-read
@@ -409,7 +416,7 @@ class LocalClient(object):
                                     continue
                             ret[fn_] = {'ret': ret_data}
                             if os.path.isfile(outp):
-                                ret[fn_]['out'] = self.serial.load(open(outp, 'r'))
+                                ret[fn_]['out'] = self.serial.load(salt.utils.fopen(outp, 'r'))
                         except Exception:
                             pass
                     found.add(fn_)
@@ -445,20 +452,32 @@ class LocalClient(object):
                 break
             time.sleep(0.01)
 
-    def get_iter_returns(self, jid, minions, timeout=None):
+    def get_iter_returns(
+            self,
+            jid,
+            minions,
+            timeout=None,
+            tgt='*',
+            tgt_type='glob',
+            **kwargs):
         '''
-        This method starts off a watcher looking at the return data for
-        a specified jid, it returns all of the information for the jid
+        Watch the event system and return job data as it comes in
         '''
+        if not isinstance(minions, set):
+            if isinstance(minions, basestring):
+                minions = set([minions])
+            elif isinstance(minions, (list, tuple)):
+                minions = set(list(minions))
+
         if timeout is None:
             timeout = self.opts['timeout']
+        inc_timeout = timeout
         jid_dir = salt.utils.jid_dir(
                 jid,
                 self.opts['cachedir'],
                 self.opts['hash_type']
                 )
-        start = 999999999999
-        gstart = int(time.time())
+        start = int(time.time())
         found = set()
         wtag = os.path.join(jid_dir, 'wtag*')
         # Check to see if the jid is real, if not return the empty dict
@@ -466,41 +485,41 @@ class LocalClient(object):
             yield {}
         # Wait for the hosts to check in
         while True:
-            for fn_ in os.listdir(jid_dir):
-                ret = {}
-                if fn_.startswith('.'):
+            raw = self.event.get_event(timeout, jid)
+            if not raw is None:
+                if 'syndic' in raw:
+                    minions.update(raw['syndic'])
                     continue
-                if fn_ not in found:
-                    retp = os.path.join(jid_dir, fn_, 'return.p')
-                    outp = os.path.join(jid_dir, fn_, 'out.p')
-                    if not os.path.isfile(retp):
-                        continue
-                    while fn_ not in ret:
-                        try:
-                            ret_data = self.serial.load(open(retp, 'r'))
-                            ret[fn_] = {'ret': ret_data}
-                            if os.path.isfile(outp):
-                                ret[fn_]['out'] = self.serial.load(open(outp, 'r'))
-                        except Exception:
-                            pass
-                    found.add(fn_)
-                    yield ret
-            if ret and start == 999999999999:
-                start = int(time.time())
+                found.add(raw['id'])
+                ret = {raw['id']: {'ret': raw['return']}}
+                if 'out' in raw:
+                    ret[raw['id']]['out'] = raw['out']
+                yield ret
+                if len(found.intersection(minions)) >= len(minions):
+                    # All minions have returned, break out of the loop
+                    break
+                continue
+            # Then event system timeout was reached and nothing was returned
+            if len(found.intersection(minions)) >= len(minions):
+                # All minions have returned, break out of the loop
+                break
             if glob.glob(wtag) and not int(time.time()) > start + timeout + 1:
                 # The timeout +1 has not been reached and there is still a
                 # write tag for the syndic
                 continue
-            if len(found.intersection(minions)) >= len(minions):
-                break
             if int(time.time()) > start + timeout:
+                # The timeout has been reached, check the jid to see if the
+                # timeout needs to be increased
+                jinfo = self.gather_job_info(jid, tgt, tgt_type, **kwargs)
+                more_time = False
+                for id_ in jinfo:
+                    if jinfo[id_]:
+                        more_time = True
+                if more_time:
+                    timeout += inc_timeout
+                    continue
                 break
-            if int(time.time()) > gstart + timeout and not ret:
-                # No minions have replied within the specified global timeout,
-                # return an empty dict
-                break
-            yield None
-            time.sleep(0.02)
+            time.sleep(0.01)
 
     def get_returns(self, jid, minions, timeout=None):
         '''
@@ -535,7 +554,7 @@ class LocalClient(object):
                         continue
                     while fn_ not in ret:
                         try:
-                            ret[fn_] = self.serial.load(open(retp, 'r'))
+                            ret[fn_] = self.serial.load(salt.utils.fopen(retp, 'r'))
                         except Exception:
                             pass
             if ret and start == 999999999999:
@@ -587,10 +606,10 @@ class LocalClient(object):
                         continue
                     while fn_ not in ret:
                         try:
-                            ret_data = self.serial.load(open(retp, 'r'))
+                            ret_data = self.serial.load(salt.utils.fopen(retp, 'r'))
                             ret[fn_] = {'ret': ret_data}
                             if os.path.isfile(outp):
-                                ret[fn_]['out'] = self.serial.load(open(outp, 'r'))
+                                ret[fn_]['out'] = self.serial.load(salt.utils.fopen(outp, 'r'))
                         except Exception:
                             pass
             if ret and start == 999999999999:
@@ -783,42 +802,9 @@ class LocalClient(object):
             yield ret
             time.sleep(0.02)
 
-
-    def find_cmd(self, cmd):
-        '''
-        Hunt through the old salt calls for when cmd was run, return a dict:
-        {'<jid>': <return_obj>}
-        '''
-        job_dir = os.path.join(self.opts['cachedir'], 'jobs')
-        ret = {}
-        for jid in os.listdir(job_dir):
-            jid_dir = salt.utils.jid_dir(
-                    jid,
-                    self.opts['cachedir'],
-                    self.opts['hash_type']
-                    )
-            loadp = os.path.join(jid_dir, '.load.p')
-            if os.path.isfile(loadp):
-                try:
-                    load = self.serial.load(open(loadp, 'r'))
-                    if load['fun'] == cmd:
-                        # We found a match! Add the return values
-                        ret[jid] = {}
-                        for host in os.listdir(jid_dir):
-                            host_dir = os.path.join(jid_dir, host)
-                            retp = os.path.join(host_dir, 'return.p')
-                            if not os.path.isfile(retp):
-                                continue
-                            ret[jid][host] = self.serial.load(open(retp))
-                except Exception:
-                    continue
-            else:
-                continue
-        return ret
-
-    def pub(self, 
-            tgt, 
-            fun, 
+    def pub(self,
+            tgt,
+            fun,
             arg=(),
             expr_form='glob',
             ret='',
@@ -871,6 +857,13 @@ class LocalClient(object):
         if expr_form == 'range' and RANGE:
             tgt = self._convert_range_to_list(tgt)
             expr_form = 'list'
+
+        # If an external job cache is specified add it to the ret list
+        if self.opts.get('ext_job_cache'):
+            if ret:
+                ret += ',{0}'.format(self.opts['ext_job_cache'])
+            else:
+                ret = self.opts['ext_job_cache']
 
         # format the payload - make a function that does this in the payload
         #   module

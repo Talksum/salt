@@ -8,6 +8,8 @@ import logging
 # Import salt libs
 import salt.minion
 import salt.fileclient
+import salt.utils
+from salt.exceptions import CommandExecutionError
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +34,7 @@ def recv(files, dest):
             return 'Destination unavailable'
 
         try:
-            open(final, 'w+').write(data)
+            salt.utils.fopen(final, 'w+').write(data)
             ret[final] = True
         except IOError:
             ret[final] = False
@@ -40,7 +42,51 @@ def recv(files, dest):
     return ret
 
 
-def get_file(path, dest, env='base'):
+def _render_filenames(path, dest, env, template):
+    if not template:
+        return (path, dest)
+
+    # render the path as a template using path_template_engine as the engine
+    if template not in salt.utils.templates.template_registry:
+        raise CommandExecutionError(
+            'Attempted to render file paths with unavailable engine '
+            '{0}'.format(template)
+        )
+
+    kwargs = {}
+    kwargs['salt'] = __salt__
+    kwargs['pillar'] = __pillar__
+    kwargs['grains'] = __grains__
+    kwargs['opts'] = __opts__
+    kwargs['env'] = env
+
+    def _render(contents):
+        # write out path to temp file
+        tmp_path_fn = salt.utils.mkstemp()
+        with salt.utils.fopen(tmp_path_fn, 'w+') as fp_:
+            fp_.write(contents)
+        data = salt.utils.templates.template_registry[template](
+            tmp_path_fn,
+            to_str=True,
+            **kwargs
+        )
+        salt.utils.safe_rm(tmp_path_fn)
+        if not data['result']:
+            # Failed to render the template
+            raise CommandExecutionError(
+                'Failed to render file path with error: {0}'.format(
+                    data['data']
+                )
+            )
+        else:
+            return data['data']
+
+    path = _render(path)
+    dest = _render(dest)
+    return (path, dest)
+
+
+def get_file(path, dest, env='base', makedirs=False, template=None, gzip=None):
     '''
     Used to get a single file from the salt master
 
@@ -48,11 +94,13 @@ def get_file(path, dest, env='base'):
 
         salt '*' cp.get_file salt://path/to/file /minion/dest
     '''
+    (path, dest) = _render_filenames(path, dest, env, template)
+
     if not hash_file(path, env):
         return ''
     else:
         client = salt.fileclient.get_file_client(__opts__)
-        return client.get_file(path, dest, False, env)
+        return client.get_file(path, dest, makedirs, env, gzip)
 
 
 def get_template(path, dest, template='jinja', env='base', **kwargs):
@@ -75,7 +123,7 @@ def get_template(path, dest, template='jinja', env='base', **kwargs):
     return client.get_template(path, dest, template, False, env, **kwargs)
 
 
-def get_dir(path, dest, env='base'):
+def get_dir(path, dest, env='base', template=None, gzip=None):
     '''
     Used to recursively copy a directory from the salt master
 
@@ -83,8 +131,10 @@ def get_dir(path, dest, env='base'):
 
         salt '*' cp.get_dir salt://path/to/dir/ /minion/dest
     '''
+    (path, dest) = _render_filenames(path, dest, env, template)
+
     client = salt.fileclient.get_file_client(__opts__)
-    return client.get_dir(path, dest, env)
+    return client.get_dir(path, dest, env, gzip)
 
 
 def get_url(path, dest, env='base'):
@@ -100,6 +150,20 @@ def get_url(path, dest, env='base'):
     return client.get_url(path, dest, False, env)
 
 
+def get_file_str(path, env='base'):
+    '''
+    Return the contents of a file from a url
+
+    CLI Example::
+
+        salt '*' cp.get_file_str salt://my/file
+    '''
+    fn_ = cache_file(path, env)
+    with salt.utils.fopen(fn_, 'r') as fp_:
+        data = fp_.read()
+    return data
+
+
 def cache_file(path, env='base'):
     '''
     Used to cache a single file in the local salt-master file cache.
@@ -109,7 +173,11 @@ def cache_file(path, env='base'):
         salt '*' cp.cache_file salt://path/to/file
     '''
     client = salt.fileclient.get_file_client(__opts__)
-    return client.cache_file(path, env)
+    result = client.cache_file(path, env)
+    if not result:
+        log.error('Unable to cache file "{0}" from env '
+                  '"{1}".'.format(path,env))
+    return result
 
 
 def cache_files(paths, env='base'):

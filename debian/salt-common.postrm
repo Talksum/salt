@@ -1,15 +1,27 @@
+#!/bin/sh -e
 # Purge config files, logs, and directories created after package install.
 # Note that user-specified alternate locations for these are not affected.
 
 clean_common() {
-# remove shared job cache and other runtime directories 
-    rm -rf /var/cache/salt /var/run/salt /etc/salt /var/log/salt 2> /dev/null
+# remove shared job cache and other runtime directories
+    rm -rf \
+        /etc/salt \
+        /var/cache/salt \
+        /var/log/salt \
+        /var/run/salt \
+    2> /dev/null
 }
 
 clean_conf() {
 # remove config and log file for master, minion, or syndic
-    rm -f /etc/salt/$1 /var/log/salt/$1 2> /dev/null
-    # XXX add more specific files to purge here XXX #
+    rm -rf \
+        /etc/salt/"$1" \
+        /etc/salt/"$1".d \
+        /etc/salt/pki/$1 \
+        /var/cache/salt/$1 \
+        /var/log/salt/$1 \
+        /var/run/salt/$1 \
+    2> /dev/null
 }
 
 purgefiles() {
@@ -38,4 +50,5 @@ case "$1" in
         exit 1 ;;
 esac
 
+#DEBHELPER#
 exit 0
