@@ -10,7 +10,7 @@
 
 Name: salt
 Version: 0.10.5
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: A parallel remote execution system
 
 Group:   System Environment/Daemons
@@ -179,6 +179,9 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Thu Nov 29 2012 Mike Chesnut <mikec@talksum.com> - 0.10.5-2
+- moving to current development head to pick up recent (showstopping) bugfixes
+
 * Mon Nov 26 2012 Mike Chesnut <mikec@talksum.com> - 0.10.5-1
 - merge from upstream for 0.10.5 release
 
