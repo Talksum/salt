@@ -246,6 +246,7 @@ class Master(SMaster):
                 self.master_key)
         reqserv.start_publisher()
         reqserv.start_event_publisher()
+        reqserv.start_reactor()
 
         def sigterm_clean(signum, frame):
             '''
@@ -328,6 +329,8 @@ class Publisher(multiprocessing.Process):
         except KeyboardInterrupt:
             pub_sock.close()
             pull_sock.close()
+        finally:
+            context.term()
 
 
 class ReqServer(object):
@@ -394,11 +397,24 @@ class ReqServer(object):
         self.eventpublisher = salt.utils.event.EventPublisher(self.opts)
         self.eventpublisher.start()
 
+    def start_reactor(self):
+        '''
+        Start the reactor, but only if the reactor interface is configured
+        '''
+        if self.opts.get('reactor'):
+            self.reactor = salt.utils.event.Reactor(self.opts)
+            self.reactor.start()
+
     def run(self):
         '''
         Start up the ReqServer
         '''
         self.__bind()
+
+    def __del__(self):
+        self.clients.close()
+        self.workers.close()
+        self.context.term()
 
 
 class MWorker(multiprocessing.Process):
@@ -444,13 +460,14 @@ class MWorker(multiprocessing.Process):
                     raise exc
         except KeyboardInterrupt:
             socket.close()
+        finally:
+            context.term()
 
     def _handle_payload(self, payload):
         '''
         The _handle_payload method is the key method used to figure out what
         needs to be done with communication to the server
         '''
-        key = load = None
         try:
             key = payload['enc']
             load = payload['load']
@@ -1009,7 +1026,8 @@ class AESFuncs(object):
             try:
                 timeout = int(clear_load['tmo'])
             except ValueError:
-                msg = 'Failed to parse timeout value: {0}'.format(clear_load['tmo'])
+                msg = 'Failed to parse timeout value: {0}'.format(
+                        clear_load['tmo'])
                 log.warn(msg)
                 return {}
         if 'tgt_type' in clear_load:
@@ -1035,14 +1053,18 @@ class AESFuncs(object):
         else:
             ret_form = 'clean'
         if ret_form == 'clean':
-            return self.local.get_returns(
+            try:
+                return self.local.get_returns(
                     jid,
                     self.ckminions.check_minions(
                         clear_load['tgt'],
                         expr_form
-                        ),
+                    ),
                     timeout
-                    )
+                )
+            finally:
+                pub_sock.close()
+                context.term()
         elif ret_form == 'full':
             ret = self.local.get_full_returns(
                     jid,
@@ -1053,7 +1075,11 @@ class AESFuncs(object):
                     timeout
                     )
             ret['__jid__'] = jid
-            return ret
+            try:
+                return ret
+            finally:
+                pub_sock.close()
+                context.term()
 
     def run_func(self, func, load):
         '''
@@ -1242,7 +1268,8 @@ class ClearFuncs(object):
                     if re.match(line, keyid):
                         return True
                 except re.error:
-                    message = "{0} is not a valid regular expression, ignoring line in {1}"
+                    message = ('{0} is not a valid regular expression, '
+                               'ignoring line in {1}')
                     log.warn(message.format(line, autosign_file))
                     continue
 
@@ -1636,6 +1663,14 @@ class ClearFuncs(object):
                 load['tgt'],
                 load.get('tgt_type', 'glob')
                 )
-        return {'enc': 'clear',
-                'load': {'jid': clear_load['jid'],
-                         'minions': minions}}
+        try:
+            return {
+                'enc': 'clear',
+                'load': {
+                    'jid': clear_load['jid'],
+                    'minions': minions
+                }
+            }
+        finally:
+            pub_sock.close()
+            context.term()

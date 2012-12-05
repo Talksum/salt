@@ -145,12 +145,11 @@ def _sunos_cpudata(osdata):
     #   cpuarch
     #   num_cpus
     #   cpu_model
-    grains = {'num_cpus': 0}
+    grains = {}
 
     grains['cpuarch'] = __salt__['cmd.run']('uname -p')
     psrinfo = '/usr/sbin/psrinfo 2>/dev/null'
-    for line in __salt__['cmd.run'](psrinfo).splitlines():
-        grains['num_cpus'] += 1
+    grains['num_cpus'] = len(__salt__['cmd.run'](psrinfo).splitlines())
     kstat_info = 'kstat -p cpu_info:*:*:implementation'
     grains['cpu_model'] = __salt__['cmd.run'](kstat_info).split()[1].strip()
     return grains
@@ -416,6 +415,7 @@ _OS_NAME_MAP = {
     'redhatente': 'RedHat',
     'gentoobase': 'Gentoo',
     'arch': 'Arch',
+    'debian': 'Debian',
 }
 
 # Map the 'os' grain to the 'os_family' grain
