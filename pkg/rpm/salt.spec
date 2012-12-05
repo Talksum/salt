@@ -98,10 +98,8 @@ install -p %{SOURCE3} $RPM_BUILD_ROOT%{_initrddir}/
 install -p %{SOURCE7} .
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/salt/
-install -p -m 0640 conf/minion.template $RPM_BUILD_ROOT%{_sysconfdir}/salt/minion
-install -p -m 0640 conf/minion.template $RPM_BUILD_ROOT%{_sysconfdir}/salt/minion.template
-install -p -m 0640 conf/master.template $RPM_BUILD_ROOT%{_sysconfdir}/salt/master
-install -p -m 0640 conf/master.template $RPM_BUILD_ROOT%{_sysconfdir}/salt/master.template
+install -p -m 0640 conf/minion $RPM_BUILD_ROOT%{_sysconfdir}/salt/minion
+install -p -m 0640 conf/master $RPM_BUILD_ROOT%{_sysconfdir}/salt/master
  
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -122,7 +120,6 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/salt-call
 %attr(0755, root, root) %{_initrddir}/salt-minion
 %config(noreplace) %{_sysconfdir}/salt/minion
-%config %{_sysconfdir}/salt/minion.template
 
 %files -n salt-master
 %defattr(-,root,root)
@@ -141,7 +138,6 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0755, root, root) %{_initrddir}/salt-master
 %attr(0755, root, root) %{_initrddir}/salt-syndic
 %config(noreplace) %{_sysconfdir}/salt/master
-%config %{_sysconfdir}/salt/master.template
 
 
 %preun -n salt-master
@@ -179,6 +175,11 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Wed Dec 05 2012 Mike Chesnut <mchesnut@gmail.com> - 0.10.5-1
+- moved to upstream release 0.10.5
+- removing references to minion.template and master.template, as those files
+  have been removed from the repo
+
 * Thu Nov 29 2012 Mike Chesnut <mikec@talksum.com> - 0.10.5-2
 - moving to current development head to pick up recent (showstopping) bugfixes
 
