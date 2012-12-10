@@ -3,7 +3,7 @@ This module contains all of the routines needed to set up a master server, this
 involves preparing the three listeners and the workers needed by the master.
 '''
 
-# Import python modules
+# Import python libs
 import os
 import re
 import time
@@ -21,16 +21,12 @@ import resource
 import subprocess
 import multiprocessing
 
-# Import zeromq
+# Import third party libs
 import zmq
-
-# Import Third Party Libs
 import yaml
-
-# RSA Support
 from M2Crypto import RSA
 
-# Import salt modules
+# Import salt libs
 import salt.crypt
 import salt.utils
 import salt.client
@@ -658,6 +654,8 @@ class AESFuncs(object):
         with salt.utils.fopen(fnd['path'], 'rb') as fp_:
             fp_.seek(load['loc'])
             data = fp_.read(self.opts['file_buffer_size'])
+            #if not data:
+            #    ret.update(self._file_hash(load))
             if gzip and data:
                 data = salt.utils.gzip_util.compress(data, gzip)
                 ret['gzip'] = gzip
@@ -795,6 +793,10 @@ class AESFuncs(object):
                     self.opts['hash_type'])
         log.info('Got return from {id} for job {jid}'.format(**load))
         self.event.fire_event(load, load['jid'])
+        if self.opts['master_ext_job_cache']:
+            fstr = '{0}.returner'.format(self.opts['master_ext_job_cache'])
+            self.mminion.returners[fstr](load)
+            return
         if not self.opts['job_cache'] or self.opts.get('ext_job_cache'):
             return
         jid_dir = salt.utils.jid_dir(

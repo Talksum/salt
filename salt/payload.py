@@ -13,7 +13,7 @@ import salt.crypt
 from salt.exceptions import SaltReqTimeoutError
 from salt._compat import pickle
 
-# Import zeromq
+# Import third party libs
 import zmq
 
 log = salt.log.logging.getLogger(__name__)
@@ -146,7 +146,11 @@ class SREQ(object):
             if polled:
                 break
             elif tried >= tries:
-                raise SaltReqTimeoutError('Waited {0} seconds'.format(timeout))
+                raise SaltReqTimeoutError(
+                    'Waited {0} seconds'.format(
+                        timeout * tried
+                    )
+                )
             tried += 1
         try:
             return self.serial.loads(self.socket.recv())

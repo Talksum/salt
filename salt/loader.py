@@ -2,7 +2,7 @@
 Routines to set up a minion
 '''
 
-# This module still needs package support, so that the functions dict
+# TODO: This module still needs package support, so that the functions dict
 # returned can send back functions like: foo.bar.baz
 
 # Import python libs
@@ -14,11 +14,12 @@ import logging
 import tempfile
 import traceback
 
-# Import Salt libs
+# Import salt libs
 from salt.exceptions import LoaderError
 from salt.template import check_render_pipe_str
 
 log = logging.getLogger(__name__)
+
 salt_base_path = os.path.dirname(salt.__file__)
 loaded_base_name = 'salt.loaded'
 
@@ -506,7 +507,7 @@ class Loader(object):
                     # reload all submodules if necessary
                     submodules = [
                         getattr(mod, sname) for sname in dir(mod) if
-                        type(getattr(mod, sname))==type(mod)
+                        isinstance(getattr(mod, sname), mod.__class__)
                     ]
                     # reload only custom "sub"modules i.e is a submodule in
                     # parent module that are still available on disk (i.e. not
@@ -578,7 +579,7 @@ class Loader(object):
                     if hasattr(mod, '__virtual__'):
                         if callable(mod.__virtual__):
                             virtual = mod.__virtual__()
-                            if virtual:
+                            if virtual and module_name != virtual:
                                 log.debug(('Loaded {0} as virtual '
                                            '{1}').format(module_name, virtual))
                                 # update the module name with the new name

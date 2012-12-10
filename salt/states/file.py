@@ -75,7 +75,8 @@ something like this:
       file.recurse:
         - source: salt://code/flask
 '''
-# Import Python libs
+
+# Import python libs
 import os
 import shutil
 import difflib
@@ -84,7 +85,7 @@ import copy
 import re
 import fnmatch
 
-# Import Salt libs
+# Import salt libs
 import salt.utils
 import salt.utils.templates
 from salt._compat import string_types
@@ -802,7 +803,7 @@ def directory(name,
                     # file.user_to_uid returns '' if user does not exist. Above
                     # check for user is not fatal, so we need to be sure user
                     # exists.
-                    if type(uid).__name__ == 'str':
+                    if isinstance(uid, basestring):
                         ret['result'] = False
                         ret['comment'] = 'Failed to enforce ownership for ' \
                                          'user {0} (user does not ' \
@@ -819,7 +820,7 @@ def directory(name,
                 if group:
                     gid = __salt__['file.group_to_gid'](group)
                     # As above with user, we need to make sure group exists.
-                    if type(gid).__name__ == 'str':
+                    if isinstance(gid, basestring):
                         ret['result'] = False
                         ret['comment'] = 'Failed to enforce group ownership ' \
                                          'for group {0}'.format(group, user)
@@ -836,7 +837,7 @@ def directory(name,
             if targets:
                 file_tree = __salt__['file.find'](name)
                 for path in file_tree:
-                    fstat = os.stat(path)
+                    fstat = os.lstat(path)
                     if 'user' in targets and fstat.st_uid != uid:
                             needs_fixed['user'] = True
                             if needs_fixed.get('group'):
