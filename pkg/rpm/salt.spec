@@ -10,7 +10,7 @@
 
 Name: salt
 Version: 0.10.5
-Release: 7%{?dist}
+Release: 8%{?dist}
 Summary: A parallel remote execution system
 
 Group:   System Environment/Daemons
@@ -175,16 +175,13 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Wed Dec 12 2012 Mike Chesnut <mikec@talksum.com> - 0.10.5-8
+- moving to current development head to pick up recent bugfixes
+
 * Wed Dec 05 2012 Mike Chesnut <mchesnut@gmail.com> - 0.10.5-1
 - moved to upstream release 0.10.5
 - removing references to minion.template and master.template, as those files
   have been removed from the repo
-
-* Thu Nov 29 2012 Mike Chesnut <mikec@talksum.com> - 0.10.5-2
-- moving to current development head to pick up recent (showstopping) bugfixes
-
-* Mon Nov 26 2012 Mike Chesnut <mikec@talksum.com> - 0.10.5-1
-- merge from upstream for 0.10.5 release
 
 * Tue Oct 24 2012 Clint Savage <herlo1@gmail.com> - 0.10.4-1
 - Moved to upstream release 0.10.4
