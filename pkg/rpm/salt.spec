@@ -9,14 +9,14 @@
 
 
 Name: salt
-Version: 0.10.5
-Release: 8%{?dist}
+Version: 0.11.0
+Release: 1%{?dist}
 Summary: A parallel remote execution system
 
 Group:   System Environment/Daemons
 License: ASL 2.0
 URL:     http://saltstack.org/
-Source0: https://github.com/downloads/saltstack/%{name}/%{name}-%{version}.tar.gz
+Source0: http://pypi.python.org/packages/source/s/%{name}/%{name}-%{version}.tar.gz
 Source1: %{name}-master
 Source2: %{name}-syndic
 Source3: %{name}-minion
@@ -29,7 +29,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildArch: noarch
 
 %ifarch %{ix86} x86_64
- Requires: dmidecode
+Requires: dmidecode
 %endif
 
 BuildRequires: python27-pyzmq
@@ -46,6 +46,7 @@ Requires: python27-Jinja2
 Requires: python27-PyYAML
 Requires: python27-M2Crypto
 Requires: python27-msgpack
+Requires: pciutils
 
 Requires(post): chkconfig
 Requires(preun): chkconfig
@@ -175,6 +176,9 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Fri Dec 14 2012 Clint Savage <herlo1@gmail.com> - 0.11.0-1
+- Moved to upstream release 0.11.0
+
 * Wed Dec 12 2012 Mike Chesnut <mikec@talksum.com> - 0.10.5-8
 - moving to current development head to pick up recent bugfixes
 
@@ -182,6 +186,10 @@ rm -rf $RPM_BUILD_ROOT
 - moved to upstream release 0.10.5
 - removing references to minion.template and master.template, as those files
   have been removed from the repo
+
+* Sun Nov 18 2012 Clint Savage <herlo1@gmail.com> - 0.10.5-1
+- Moved to upstream release 0.10.5
+- Added pciutils as Requires
 
 * Tue Oct 24 2012 Clint Savage <herlo1@gmail.com> - 0.10.4-1
 - Moved to upstream release 0.10.4
