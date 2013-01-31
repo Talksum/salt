@@ -24,6 +24,7 @@ Source3: %{name}-minion
 #Source5: %{name}-syndic.service
 #Source6: %{name}-minion.service
 Source7: README.fedora
+
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildArch: noarch
@@ -100,7 +101,8 @@ install -p %{SOURCE7} .
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/salt/
 install -p -m 0640 conf/minion $RPM_BUILD_ROOT%{_sysconfdir}/salt/minion
 install -p -m 0640 conf/master $RPM_BUILD_ROOT%{_sysconfdir}/salt/master
- 
+
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -176,8 +178,15 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Wed Jan 30 2013 Mike Chesnut <mikec@talksum.com> - 0.12.1-1
-- move to upstream 0.12 branch
+- merge from upstream to get latest 0.12.1 dev (especially #3517)
 - remove dependency on python27-distribute thanks to #2928
+- remove patches and %check stage (I don't want them)
+
+* Thu Jan 17 2013 Wendall Cada <wendallc@83864.com> - 0.12.0-2
+- Added unittest support
+
+* Wed Jan 16 2013 Clint Savage <herlo1@gmail.com> - 0.12.0-1
+- Upstream release 0.12.0
 
 * Fri Dec 14 2012 Clint Savage <herlo1@gmail.com> - 0.11.1-1
 - Upstream patch release 0.11.1
