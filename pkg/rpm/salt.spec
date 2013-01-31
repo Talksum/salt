@@ -9,7 +9,7 @@
 
 
 Name: salt
-Version: 0.11.1
+Version: 0.12.1
 Release: 1%{?dist}
 Summary: A parallel remote execution system
 
