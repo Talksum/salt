@@ -38,7 +38,6 @@ BuildRequires: python27-devel
 BuildRequires: python27-PyYAML
 BuildRequires: python27-M2Crypto
 BuildRequires: python27-msgpack
-BuildRequires: python27-distribute
 
 Requires: python27-pycrypto
 Requires: python27-pyzmq
@@ -176,6 +175,10 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Wed Jan 30 2013 Mike Chesnut <mikec@talksum.com> - 0.12.1-1
+- move to upstream 0.12 branch
+- remove dependency on python27-distribute thanks to #2928
+
 * Fri Dec 14 2012 Clint Savage <herlo1@gmail.com> - 0.11.1-1
 - Upstream patch release 0.11.1
 - Fixes security vulnerability (https://github.com/saltstack/salt/issues/2916)
