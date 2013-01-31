@@ -10,7 +10,6 @@ import logging
 import os
 import shutil
 import subprocess
-import sys
 from functools import partial
 
 # Import salt libs
@@ -28,10 +27,6 @@ except ImportError:
 # Set up logging
 log = logging.getLogger(__name__)
 
-# Set up the default outputters
-__outputter__ = {
-    'run': 'txt',
-}
 
 DEFAULT_SHELL = shell_grain()['shell']
 
@@ -88,13 +83,14 @@ def _chugid(runas):
 
 def _render_cmd(cmd, cwd, template):
     '''
-    If template is a valid template engine, process the cmd and cwd through that engine.
+    If template is a valid template engine, process the cmd and cwd through
+    that engine.
     '''
     if not template:
         return (cmd, cwd)
 
     # render the path as a template using path_template_engine as the engine
-    if template not in salt.utils.templates.template_registry:
+    if template not in salt.utils.templates.TEMPLATE_REGISTRY:
         raise CommandExecutionError(
             'Attempted to render file paths with unavailable engine '
             '{0}'.format(template)
@@ -112,7 +108,7 @@ def _render_cmd(cmd, cwd, template):
         tmp_path_fn = salt.utils.mkstemp()
         with salt.utils.fopen(tmp_path_fn, 'w+') as fp_:
             fp_.write(contents)
-        data = salt.utils.templates.template_registry[template](
+        data = salt.utils.templates.TEMPLATE_REGISTRY[template](
             tmp_path_fn,
             to_str=True,
             **kwargs
@@ -159,7 +155,7 @@ def _run(cmd,
         if not os.access(cwd, os.R_OK):
             cwd = '/'
 
-    if not sys.platform.startswith('win'):
+    if not salt.utils.is_windows():
         if not os.path.isfile(shell) or not os.access(shell, os.X_OK):
             msg = 'The shell {0} is not available'.format(shell)
             raise CommandExecutionError(msg)
@@ -194,6 +190,15 @@ def _run(cmd,
             )
         )
 
+    if not env:
+        env = {}
+
+    if not salt.utils.is_windows():
+        # Default to C!
+        # Salt only knows how to parse English words
+        # Don't override if the user has passed LC_ALL
+        env.setdefault('LC_ALL', 'C')
+
     run_env = os.environ
     run_env.update(env)
     kwargs = {'cwd': cwd,
@@ -205,15 +210,16 @@ def _run(cmd,
     if runas:
         kwargs['preexec_fn'] = partial(_chugid, runas)
 
-    if not sys.platform.startswith('win'):
+    if not salt.utils.is_windows():
         # close_fds is not supported on Windows platforms if you redirect
         # stdin/stdout/stderr
         kwargs['executable'] = shell
         kwargs['close_fds'] = True
 
-    # If all we want is the return code then don't block on gathering input.
+    # Setting stdout to None seems to cause the Process to fail.
+    # See bug #2640 for more info
     if retcode:
-        kwargs['stdout'] = None
+        #kwargs['stdout'] = None
         kwargs['stderr'] = None
 
     # This is where the magic happens
@@ -289,7 +295,7 @@ def run_stdout(cmd, cwd=None, runas=None, shell=DEFAULT_SHELL, env=(),
         salt '*' cmd.run_stdout template=jinja "ls -l /tmp/{{grains.id}} | awk '/foo/{print $2}'"
 
     '''
-    stdout = _run(cmd, runas=runas, cwd=cwd, shell=shell, env=(),
+    stdout = _run(cmd, runas=runas, cwd=cwd, shell=shell, env=env,
                   template=template, rstrip=rstrip)["stdout"]
     log.debug('stdout: {0}'.format(stdout))
     return stdout
@@ -411,10 +417,11 @@ def script(
     else:
         fn_ = __salt__['cp.cache_file'](source, env)
         shutil.copyfile(fn_, path)
-    os.chmod(path, 320)
-    os.chown(path, __salt__['file.user_to_uid'](runas), -1)
+    if not salt.utils.is_windows():
+        os.chmod(path, 320)
+        os.chown(path, __salt__['file.user_to_uid'](runas), -1)
     ret = _run(
-            path +' '+ args if args else path,
+            path + ' ' + args if args else path,
             cwd=cwd,
             quiet=kwargs.get('quiet', False),
             runas=runas,
@@ -458,6 +465,7 @@ def script_retcode(
             template,
             retcode=True,
             **kwargs)['retcode']
+
 
 def which(cmd):
     '''

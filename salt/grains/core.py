@@ -42,13 +42,13 @@ __salt__ = {
 
 log = logging.getLogger(__name__)
 
-has_wmi = False
-if sys.platform.startswith('win'):
+HAS_WMI = False
+if salt.utils.is_windows():
     # attempt to import the python wmi module
     # the Windows minion uses WMI for some of its grains
     try:
         import wmi
-        has_wmi = True
+        HAS_WMI = True
     except ImportError:
         log.exception("Unable to import Python wmi module, some core grains "
                       "will be missing")
@@ -211,8 +211,8 @@ def _bsd_cpudata(osdata):
                         start = line.find('<')
                         end = line.find('>')
                         if start > 0 and end > 0:
-                            f = line[start + 1:end].split(',')
-                            grains['cpu_flags'].extend(f)
+                            flag = line[start + 1:end].split(',')
+                            grains['cpu_flags'].extend(flag)
     try:
         grains['num_cpus'] = int(grains['num_cpus'])
     except ValueError:
@@ -250,8 +250,8 @@ def _memdata(osdata):
         meminfo = '/proc/meminfo'
 
         if os.path.isfile(meminfo):
-            with salt.utils.fopen(meminfo, 'r') as f:
-                for line in f:
+            with salt.utils.fopen(meminfo, 'r') as ifile:
+                for line in ifile:
                     comps = line.rstrip('\n').split(':')
                     if not len(comps) > 1:
                         continue
@@ -268,7 +268,7 @@ def _memdata(osdata):
             comps = line.split(' ')
             if comps[0].strip() == 'Memory' and comps[1].strip() == 'size:':
                 grains['mem_total'] = int(comps[2].strip())
-    elif osdata['kernel'] == 'Windows' and has_wmi:
+    elif osdata['kernel'] == 'Windows' and HAS_WMI:
         wmi_c = wmi.WMI()
         # this is a list of each stick of ram in a system
         # WMI returns it as the string value of the number of bytes
@@ -452,7 +452,7 @@ def _windows_platform_data(osdata):
     #    timezone
     #    windowsdomain
 
-    if not has_wmi:
+    if not HAS_WMI:
         return {}
 
     wmi_c = wmi.WMI()
@@ -495,19 +495,24 @@ _REPLACE_LINUX_RE = re.compile(r'linux', re.IGNORECASE)
 
 # This maps (at most) the first ten characters (no spaces, lowercased) of
 # 'osfullname' to the 'os' grain that Salt traditionally uses.
-# Please see _supported_dists defined at the top of the file
+# Please see os_data() and _supported_dists.
+# If your system is not detecting properly it likely needs an entry here.
 _OS_NAME_MAP = {
     'redhatente': 'RedHat',
     'gentoobase': 'Gentoo',
     'archarm': 'Arch ARM',
     'arch': 'Arch',
     'debian': 'Debian',
+    'debiangnu/': 'Debian',
     'fedoraremi': 'RedHat',
+    'amazonami': 'RedHat',
 }
 
 # Map the 'os' grain to the 'os_family' grain
+# These should always be capitalized entries as the lookup comes
+# post-_OS_NAME_MAP. If your system is having trouble with detection, please
+# make sure that the 'os' grain is capitalized and working correctly first.
 _OS_FAMILY_MAP = {
-    'debian': 'Debian',
     'Ubuntu': 'Debian',
     'Fedora': 'RedHat',
     'CentOS': 'RedHat',
@@ -523,6 +528,8 @@ _OS_FAMILY_MAP = {
     'Bluewhite64': 'Bluewhite',
     'Slamd64': 'Slackware',
     'SLES': 'Suse',
+    'SUSE Enterprise Server': 'Suse',
+    'SUSE  Enterprise Server': 'Suse',
     'SLED': 'Suse',
     'openSUSE': 'Suse',
     'SUSE': 'Suse',
@@ -547,7 +554,7 @@ def os_data():
     # ('Linux', 'MINIONNAME', '2.6.32-38-server', '#83-Ubuntu SMP Wed Jan 4 11:26:59 UTC 2012', 'x86_64', '')
     (grains['kernel'], grains['nodename'],
      grains['kernelrelease'], version, grains['cpuarch'], _) = platform.uname()
-    if grains['kernel'] == 'Windows':
+    if salt.utils.is_windows():
         grains['osrelease'] = grains['kernelrelease']
         grains['osversion'] = grains['kernelrelease'] = version
         grains['os'] = 'Windows'
@@ -557,7 +564,7 @@ def os_data():
         grains.update(_windows_cpudata())
         grains.update(_ps(grains))
         return grains
-    elif grains['kernel'] == 'Linux':
+    elif salt.utils.is_linux():
         # Add lsb grains on any distro with lsb-release
         try:
             import lsb_release
@@ -567,8 +574,8 @@ def os_data():
         except ImportError:
             # if the python library isn't available, default to regex
             if os.path.isfile('/etc/lsb-release'):
-                with salt.utils.fopen('/etc/lsb-release') as f:
-                    for line in f:
+                with salt.utils.fopen('/etc/lsb-release') as ifile:
+                    for line in ifile:
                         # Matches any possible format:
                         #     DISTRIB_ID="Ubuntu"
                         #     DISTRIB_ID='Mageia'
@@ -583,9 +590,9 @@ def os_data():
                             grains['lsb_{0}'.format(match.groups()[0].lower())] = match.groups()[1].rstrip()
             elif os.path.isfile('/etc/os-release'):
                 # Arch ARM linux
-                with salt.utils.fopen('/etc/os-release') as f:
+                with salt.utils.fopen('/etc/os-release') as ifile:
                     # Imitate lsb-release
-                    for line in f:
+                    for line in ifile:
                         # NAME="Arch Linux ARM"
                         # ID=archarm
                         # ID_LIKE=arch
@@ -674,7 +681,6 @@ def locale_info():
         grains['defaultlanguage'] = 'unknown'
         grains['defaultencoding'] = 'unknown'
     return grains
-
 
 
 def hostname():
@@ -856,5 +862,3 @@ def get_server_id():
     # Provides:
     #   server_id
     return {'server_id': abs(hash(__opts__.get('id', '')) % (2 ** 31))}
-
-

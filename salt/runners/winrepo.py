@@ -4,14 +4,16 @@ Runner to manage Windows software repo
 
 # Import python libs
 import os
+
+# Import third party libs
 import yaml
-from pprint import pprint
 import msgpack
 
 # Import salt libs
 import salt.output
 import salt.utils
 import logging
+import salt.minion
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +24,7 @@ def genrepo():
     '''
     ret = {}
     repo = __opts__['win_repo']
+    winrepo = __opts__['win_repo_mastercachefile']
     for root, dirs, files in os.walk(repo):
         for name in files:
             if name.endswith('.sls'):
@@ -37,7 +40,26 @@ def genrepo():
                         print 'Failed to compile {0}: {1}'.format(os.path.join(root, name), exc)
                 if config:
                     ret.update(config)
-    with salt.utils.fopen(os.path.join(repo, 'winrepo.cache'), 'w') as repo:
+    with salt.utils.fopen(os.path.join(repo, winrepo), 'w') as repo:
         repo.write(msgpack.dumps(ret))
+    salt.output.display_output(ret, 'pprint', __opts__)
+    return ret
+
+def update_git_repos():
+    '''
+    Checkout git repos containing Windows Software Package Definitions
+    '''
+    ret = {}
+    mminion = salt.minion.MasterMinion(__opts__)
+    repo = __opts__['win_repo']
+    gitrepos = __opts__['win_gitrepos']
+    for gitrepo in gitrepos:
+        if '/' in gitrepo:
+            targetname = gitrepo.split('/')[-1]
+        else:
+            targetname = gitrepo
+        gittarget = os.path.join(repo, targetname)
+        result = mminion.states['git.latest'](gitrepo, target=gittarget, force=True)
+        ret[result['name']] = result['result']
     salt.output.display_output(ret, 'pprint', __opts__)
     return ret
