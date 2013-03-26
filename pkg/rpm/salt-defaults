@@ -1,0 +1,4 @@
+SALTMASTER=/usr/local/bin/salt-master
+SALTMINION=/usr/local/bin/salt-minion
+SALTSYNDIC=/usr/local/bin/salt-syndic
+PYTHON=/usr/local/bin/python

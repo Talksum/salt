@@ -7,9 +7,8 @@
 
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 
-
 Name: salt
-Version: 0.12.1
+Version: 0.14.0
 Release: 1%{?dist}
 Summary: A parallel remote execution system
 
@@ -24,6 +23,7 @@ Source3: %{name}-minion
 #Source5: %{name}-syndic.service
 #Source6: %{name}-minion.service
 Source7: README.fedora
+Source8: salt-defaults
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -83,9 +83,7 @@ Salt minion is queried and controlled from the master.
 %prep
 %setup -q
 
-
 %build
-
 
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -102,6 +100,8 @@ mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/salt/
 install -p -m 0640 conf/minion $RPM_BUILD_ROOT%{_sysconfdir}/salt/minion
 install -p -m 0640 conf/master $RPM_BUILD_ROOT%{_sysconfdir}/salt/master
 
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/default/
+install -p -m 0644 %{SOURCE8} $RPM_BUILD_ROOT%{_sysconfdir}/default/salt
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -111,6 +111,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc LICENSE
 %{python_sitelib}/%{name}/*
 %{python_sitelib}/%{name}-*-py?.?.egg-info
+%{_sysconfdir}/default/salt
 %doc %{_mandir}/man7/salt.7
 %doc README.fedora
 
@@ -140,7 +141,6 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0755, root, root) %{_initrddir}/salt-master
 %attr(0755, root, root) %{_initrddir}/salt-syndic
 %config(noreplace) %{_sysconfdir}/salt/master
-
 
 %preun -n salt-master
   if [ $1 -eq 0 ] ; then
@@ -175,8 +175,27 @@ rm -rf $RPM_BUILD_ROOT
       /sbin/service salt-syndic condrestart >/dev/null 2>&1 || :
   fi
 
-
 %changelog
+* Mon Mar 25 2013 Mike Chesnut <mikec@talksum.com> - 0.14.0-1
+- merge changes from upstream release 0.14.0
+- add handling of /etc/default/salt, and a default of this file for talkos env
+
+* Sat Mar 23 2013 Clint Savage <herlo1@gmail.com> - 0.14.0-1
+- Update to upstream feature release 0.14.0
+
+* Fri Mar 22 2013 Clint Savage <herlo1@gmail.com> - 0.13.3-1
+- Update to upstream patch release 0.13.3
+
+* Wed Mar 13 2013 Clint Savage <herlo1@gmail.com> - 0.13.2-1
+- Update to upstream patch release 0.13.2
+
+* Fri Feb 15 2013 Clint Savage <herlo1@gmail.com> - 0.13.1-1
+- Update to upstream patch release 0.13.1
+- Add unittest support
+
+* Sat Feb 02 2013 Clint Savage <herlo1@gmail.com> - 0.12.1-1
+- Remove patches and update to upstream patch release 0.12.1
+
 * Wed Jan 30 2013 Mike Chesnut <mikec@talksum.com> - 0.12.1-1
 - merge from upstream to get latest 0.12.1 dev (especially #3517)
 - remove dependency on python27-distribute thanks to #2928

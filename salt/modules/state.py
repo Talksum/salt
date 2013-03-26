@@ -12,8 +12,8 @@ import json
 import salt.utils
 import salt.state
 import salt.payload
-from salt.utils.yaml import load as _yaml_load
-from salt.utils.yaml import CustomLoader as _YamlCustomLoader
+from salt.utils.yamlloader import load as _yaml_load
+from salt.utils.yamlloader import CustomLoader as _YamlCustomLoader
 from salt._compat import string_types
 
 
@@ -25,6 +25,36 @@ __outputter__ = {
 }
 
 log = logging.getLogger(__name__)
+
+
+def __resolve_struct(value, kwval_as):
+    '''
+    Take a string representing a structure and safely serialize it with the
+    specified medium
+    '''
+    if kwval_as == 'yaml':
+        return  _yaml_load(value, _YamlCustomLoader)
+    elif kwval_as == 'json':
+        return json.loads(value)
+    elif kwval_as is None or kwval_as == 'verbatim':
+        return value
+
+
+def _filter_running(running):
+    '''
+    Filter out the result: True + no changes data
+    '''
+    ret = {}
+    for tag in running:
+        if running[tag]['result']:
+            # It is true
+            if running[tag]['changes']:
+                # It is blue
+                ret[tag] = running[tag]
+                continue
+        else:
+            ret[tag] = running[tag]
+    return ret
 
 
 def running():
@@ -65,6 +95,7 @@ def low(data):
     st_ = salt.state.State(__opts__)
     err = st_.verify_data(data)
     if err:
+        __context__['retcode'] = 1
         return err
     return st_.call(data)
 
@@ -126,14 +157,25 @@ def highstate(test=None, **kwargs):
     conflict = running()
     if conflict:
         return conflict
-    salt.utils.daemonize_if(__opts__, **kwargs)
     opts = copy.copy(__opts__)
 
-    if not test is None:
-        opts['test'] = test
+    if salt.utils.test_mode(test=test, **kwargs):
+        opts['test'] = True
+    else:
+        opts['test'] = None
 
-    st_ = salt.state.HighState(opts)
-    ret = st_.call_highstate(exclude=kwargs.get('exclude', []))
+    pillar = __resolve_struct(
+            kwargs.get('pillar', ''),
+            kwargs.get('kwval_as', 'yaml'))
+
+    st_ = salt.state.HighState(opts, pillar)
+    st_.push_active()
+    try:
+        ret = st_.call_highstate(exclude=kwargs.get('exclude', []))
+    finally:
+        st_.pop_active()
+    if __salt__['config.option']('state_data', '') == 'terse' or kwargs.get('terse'):
+        ret = _filter_running(ret)
     serial = salt.payload.Serial(__opts__)
     cache_file = os.path.join(__opts__['cachedir'], 'highstate.p')
 
@@ -146,6 +188,8 @@ def highstate(test=None, **kwargs):
         msg = 'Unable to write to "state.highstate" cache file {0}'
         log.error(msg.format(cache_file))
 
+    if isinstance(ret, list):
+        __context__['retcode'] = 1
     return ret
 
 
@@ -163,28 +207,39 @@ def sls(mods, env='base', test=None, exclude=None, **kwargs):
         return conflict
     opts = copy.copy(__opts__)
 
-    if not test is None:
-        opts['test'] = test
+    if salt.utils.test_mode(test=test, **kwargs):
+        opts['test'] = True
+    else:
+        opts['test'] = None
 
-    salt.utils.daemonize_if(opts, **kwargs)
-    st_ = salt.state.HighState(opts)
+    pillar = __resolve_struct(
+            kwargs.get('pillar', ''),
+            kwargs.get('kwval_as', 'yaml'))
+
+    st_ = salt.state.HighState(opts, pillar)
 
     if isinstance(mods, string_types):
         mods = mods.split(',')
 
-    high, errors = st_.render_highstate({env: mods})
+    st_.push_active()
+    try:
+        high, errors = st_.render_highstate({env: mods})
 
-    if errors:
-        return errors
+        if errors:
+            return errors
 
-    if exclude:
-        if isinstance(exclude, str):
-            exclude = exclude.split(',')
-        if '__exclude__' in high:
-            high['__exclude__'].extend(exclude)
-        else:
-            high['__exclude__'] = exclude
-    ret = st_.state.call_high(high)
+        if exclude:
+            if isinstance(exclude, str):
+                exclude = exclude.split(',')
+            if '__exclude__' in high:
+                high['__exclude__'].extend(exclude)
+            else:
+                high['__exclude__'] = exclude
+        ret = st_.state.call_high(high)
+    finally:
+        st_.pop_active()
+    if __salt__['config.option']('state_data', '') == 'terse' or kwargs.get('terse'):
+        ret = _filter_running(ret)
     serial = salt.payload.Serial(__opts__)
     cache_file = os.path.join(__opts__['cachedir'], 'sls.p')
     try:
@@ -193,6 +248,8 @@ def sls(mods, env='base', test=None, exclude=None, **kwargs):
     except (IOError, OSError):
         msg = 'Unable to write to "state.sls" cache file {0}'
         log.error(msg.format(cache_file))
+    if isinstance(ret, list):
+        __context__['retcode'] = 1
     return ret
 
 
@@ -208,8 +265,12 @@ def top(topfn):
     if conflict:
         return conflict
     st_ = salt.state.HighState(__opts__)
+    st_.push_active()
     st_.opts['state_top'] = os.path.join('salt://', topfn)
-    return st_.call_highstate()
+    try:
+        return st_.call_highstate()
+    finally:
+        st_.pop_active()
 
 
 def show_highstate():
@@ -221,7 +282,10 @@ def show_highstate():
         salt '*' state.show_highstate
     '''
     st_ = salt.state.HighState(__opts__)
-    return st_.compile_highstate()
+    ret = st_.compile_highstate()
+    if isinstance(ret, list):
+        __context__['retcode'] = 1
+    return ret
 
 
 def show_lowstate():
@@ -233,7 +297,10 @@ def show_lowstate():
         salt '*' state.show_lowstate
     '''
     st_ = salt.state.HighState(__opts__)
-    return st_.compile_low_chunks()
+    ret = st_.compile_low_chunks()
+    if isinstance(ret, list):
+        __context__['retcode'] = 1
+    return ret
 
 
 def show_sls(mods, env='base', test=None, **kwargs):
@@ -246,9 +313,12 @@ def show_sls(mods, env='base', test=None, **kwargs):
         salt '*' state.show_sls core,edit.vim dev
     '''
     opts = copy.copy(__opts__)
-    if not test is None:
-        opts['test'] = test
-    salt.utils.daemonize_if(opts, **kwargs)
+    if salt.utils.test_mode(test=test, **kwargs):
+        opts['test'] = True
+    else:
+        opts['test'] = None
+    log.critical('BAR')
+    log.critical(opts)
     st_ = salt.state.HighState(opts)
     if isinstance(mods, string_types):
         mods = mods.split(',')
@@ -256,15 +326,34 @@ def show_sls(mods, env='base', test=None, **kwargs):
     errors += st_.state.verify_high(high)
     if errors:
         return errors
+    if isinstance(high, list):
+        __context__['retcode'] = 1
     return high
 
 
 def show_top():
     '''
     Return the top data that the minion will use for a highstate
+
+    CLI Example::
+
+        salt '*' state.show_top
     '''
     st_ = salt.state.HighState(__opts__)
-    return st_.get_top()
+    ret = {}
+    static = st_.get_top()
+    ext = st_.client.ext_nodes()
+    for top in [static, ext]:
+        for env in top:
+            if not env in ret:
+                ret[env] = top[env]
+            else:
+                for match in top[env]:
+                    if not match in ret[env]:
+                        ret[env][match] = top[env][match]
+                    else:
+                        ret[env][match].extend(top[env][match])
+    return ret
 
 # Just commenting out, someday I will get this working
 #def show_masterstate():
@@ -305,8 +394,10 @@ def single(fun, name, test=None, kwval_as='yaml', **kwargs):
                    '__id__': name,
                    'name': name})
     opts = copy.copy(__opts__)
-    if not test is None:
-        opts['test'] = test
+    if salt.utils.test_mode(test=test, **kwargs):
+        opts['test'] = True
+    else:
+        opts['test'] = None
     st_ = salt.state.State(opts)
     err = st_.verify_data(kwargs)
     if err:
@@ -318,6 +409,8 @@ def single(fun, name, test=None, kwval_as='yaml', **kwargs):
     elif kwval_as == 'json':
         def parse_kwval(value):
             return json.loads(value)
+    elif kwval_as is None or kwval_as == 'verbatim':
+        parse_kwval = lambda value: value
     else:
         return 'Unknown format({0}) for state keyword arguments!'.format(
                 kwval_as)
