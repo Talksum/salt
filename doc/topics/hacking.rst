@@ -11,29 +11,36 @@ There are a number of ways to contribute to salt development.
 Sending a Github pull request
 -----------------------------
 
-This is the preferred method for contributions, simply create a Github
+This is the preferred method for contributions. Simply create a Github
 fork, commit changes to the fork, and then open up a pull request.
 
 The following is an example (from `Open Comparison Contributing Docs`_ ) 
 of an efficient workflow for forking, cloning, branching, committing, and 
 sending a pull request for a github repository.
 
-Once the salt github repo is cloned locally and changes are ready to submit, do the following::
+First, make a local clone of your github fork of the salt github repo and make edits and 
+changes locally.
+
+Then, create a new branch on your clone by entering the following commands::
 
     git checkout -b fixed-broken-thing
+
     Switched to a new branch 'fixed-broken-thing'
 
 Choose a name for your branch that describes its purpose.  
 
-To generate a pull request, either for preliminary review,
-or for consideration of merging into the project, first push the local
-feature branch back up to GitHub::
+Now commit your changes to this new branch with the following command::
 
-    git push origin fixed-broken-thing
+    #add and commit all changes at once
+    git commit -a -m 'description of my fixes for the broken thing'
+
+And then push your locally committed changes back up to GitHub::
+
+    git push --set-upstream origin fixed-broken-thing
     
-When looking at the fork on GitHub, this new branch will now be listed under
-the "Source" tab where it says "Switch Branches".  Select the feature branch 
-from this list, and then click the "Pull request" button.
+Now go look at your fork of the salt repo on the GitHub website. The new 
+branch will now be listed under the "Source" tab where it says "Switch Branches".
+Select the new branch from this list, and then click the "Pull request" button.
 
 Put in a descriptive comment, and include links to any project issues related to the pull request.
 
@@ -98,8 +105,8 @@ Clone the repository using::
 .. note:: tags
 
     Just cloning the repository is enough to work with Salt and make
-    contributions. However, you must fetch additional tags into your clone to
-    have Salt report the correct version for itself. To do this you must first
+    contributions. However, fetching additional tags from git is required to
+    have Salt report the correct version for itself. To do this, first
     add the git repository as an upstream source::
 
         git remote add upstream http://github.com/saltstack/salt
@@ -117,15 +124,13 @@ Create a new `virtualenv`_::
 On Arch Linux, where Python 3 is the default installation of Python, use the
 ``virtualenv2`` command instead of ``virtualenv``.
 
-.. note:: Using your system Python modules in the virtualenv
+.. note:: Using system Python modules in the virtualenv
 
-    If you have the required python modules installed on your system already
-    and would like to use them in the virtualenv rather than having pip
-    download and compile new ones into this environment, run ``virtualenv``
-    with the ``--system-site-packages`` option. If you do this, you can skip
-    the pip command below that installs the dependencies (pyzmq, M2Crypto,
-    etc.), assuming that the listed modules are all installed in your system
-    PYTHONPATH at the time you create your virtualenv.
+    To use already-installed python modules in virtualenv (instead of having pip
+    download and compile new ones), run ``virtualenv --system-site-packages``
+    Using this method eliminates the requirement to install the salt dependencies
+    again, although it does assume that the listed modules are all installed in the
+    system PYTHONPATH at the time of virtualenv creation.
 
 Activate the virtualenv::
 
@@ -139,25 +144,33 @@ Install Salt (and dependencies) into the virtualenv::
 
 .. note:: Installing M2Crypto
 
-    You may need ``swig`` and ``libssl-dev`` to build M2Crypto. If you 
-    encounter the error ``command 'swig' failed with exit status 1``
-    while installing M2Crypto, try installing it with the following command::
+    ``swig`` and ``libssl-dev`` are required to build M2Crypto. To fix
+    the error ``command 'swig' failed with exit status 1`` while installing M2Crypto, 
+    try installing it with the following command::
 
         env SWIG_FEATURES="-cpperraswarn -includeall -D__`uname -m`__ -I/usr/include/openssl" pip install M2Crypto
 
     Debian and Ubuntu systems have modified openssl libraries and mandate that
     a patched version of M2Crypto be installed. This means that M2Crypto
-    needs to be installed via apt:
+    needs to be installed via apt::
 
         apt-get install python-m2crypto
 
-    This also means that you should use ``--system-site-packages`` when
-    creating the virtualenv, to pull in the M2Crypto installed using apt.
+    This also means that pulling in the M2Crypto installed using apt requires using
+    ``--system-site-packages`` when creating the virtualenv.
 
+.. note:: Installing psutil
+
+    Python header files are required to build this module, otherwise the pip
+    install will fail. If your distribution separates binaries and headers into
+    separate packages, make sure that you have the headers installed. In most
+    Linux distributions which split the headers into their own package, this
+    can be done by installing the ``python-dev`` or ``python-devel`` package.
+    For other platforms, the package will likely be similarly named.
 
 .. note:: Important note for those developing using RedHat variants
 
-    If you are developing on a RedHat variant, be advised that the package
+    For developers using a RedHat variant, be advised that the package
     provider for newer Redhat-based systems (:doc:`yumpkg.py
     <../ref/modules/all/salt.modules.yumpkg>`) relies on RedHat's python
     interface for yum. The variants that use this module to provide package
@@ -167,15 +180,18 @@ Install Salt (and dependencies) into the virtualenv::
     * `Fedora Linux`_ releases 11 and later
     * `Amazon Linux`_
 
-    If you are developing using one of these releases, you will want to create
-    your virtualenv using the ``--system-site-packages`` option so that these
-    modules are available in the virtualenv.
+    Developers using one of these systems should create the salt virtualenv using the 
+    ``--system-site-packages`` option to ensure that the correct modules are available.
 
 .. _`RHEL`: https://www.redhat.com/products/enterprise-linux/
 .. _`CentOS`: http://centos.org/
 .. _`Fedora Linux`: http://fedoraproject.org/
 .. _`Amazon Linux`: https://aws.amazon.com/amazon-linux-ami/
 
+.. note:: Installing dependencies on OS X.
+
+    You can install needed dependencies on OS X using homebrew or macports.
+    See :doc:`OS X Installation </topics/installation/osx>`
 
 Running a self-contained development version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -252,19 +268,18 @@ path. This can be done in a couple different ways:
 ``NOTE:`` The socket path is limited to 107 characters on Solaris and Linux,
 and 103 characters on BSD-based systems.
 
+.. note:: File descriptor limits
 
-File descriptor limit
-~~~~~~~~~~~~~~~~~~~~~
+    Ensure that the system open file limit is raised to at least 2047::
 
-Check your file descriptor limit with::
+        # check your current limit
+        ulimit -n
 
-    ulimit -n
+        # raise the limit. persists only until reboot
+        # use 'limit descriptors 2047' for c-shell
+        ulimit -n 2047
 
-If it is less than 2047, you should increase it with::
-
-    ulimit -n 2047
-    (or "limit descriptors 2047" for c-shell)
-
+    To set file descriptors on OSX, refer to the :doc:`OS X Installation </topics/installation/osx>` instructions.
 
 Running the tests
 ~~~~~~~~~~~~~~~~~
