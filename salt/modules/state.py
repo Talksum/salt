@@ -198,7 +198,11 @@ def highstate(test=None, **kwargs):
     st_ = salt.state.HighState(opts, pillar)
     st_.push_active()
     try:
-        ret = st_.call_highstate(exclude=kwargs.get('exclude', []))
+        ret = st_.call_highstate(
+                exclude=kwargs.get('exclude', []),
+                cache=kwargs.get('cache', None),
+                cache_name=kwargs.get('cache_name', 'highstate')
+                )
     finally:
         st_.pop_active()
     if __salt__['config.option']('state_data', '') == 'terse' or kwargs.get('terse'):
@@ -228,6 +232,7 @@ def sls(mods, env='base', test=None, exclude=None, **kwargs):
 
         salt '*' state.sls core,edit.vim dev
     '''
+
     conflict = running()
     if conflict:
         __context__['retcode'] = 1
@@ -243,7 +248,19 @@ def sls(mods, env='base', test=None, exclude=None, **kwargs):
             kwargs.get('pillar', ''),
             kwargs.get('kwval_as', 'yaml'))
 
+    serial = salt.payload.Serial(__opts__)
+    cfn = os.path.join(
+            __opts__['cachedir'],
+            '{0}.cache.p'.format(kwargs.get('cache_name', 'highstate'))
+            )
+
     st_ = salt.state.HighState(opts, pillar)
+
+    if kwargs.get('cache'):
+        if os.path.isfile(cfn):
+            with open(cfn, 'r') as fp_:
+                high = serial.load(fp_)
+                return st_.state.call_high(high)
 
     if isinstance(mods, string_types):
         mods = mods.split(',')
@@ -268,7 +285,6 @@ def sls(mods, env='base', test=None, exclude=None, **kwargs):
         st_.pop_active()
     if __salt__['config.option']('state_data', '') == 'terse' or kwargs.get('terse'):
         ret = _filter_running(ret)
-    serial = salt.payload.Serial(__opts__)
     cache_file = os.path.join(__opts__['cachedir'], 'sls.p')
     try:
         with salt.utils.fopen(cache_file, 'w+') as fp_:
@@ -277,10 +293,12 @@ def sls(mods, env='base', test=None, exclude=None, **kwargs):
         msg = 'Unable to write to "state.sls" cache file {0}'
         log.error(msg.format(cache_file))
     _set_retcode(ret)
+    with open(cfn, 'w+') as fp_:
+        serial.dump(high, fp_)
     return ret
 
 
-def top(topfn):
+def top(topfn, test=None, **kwargs):
     '''
     Execute a specific top file instead of the default
 
@@ -292,11 +310,19 @@ def top(topfn):
     if conflict:
         __context__['retcode'] = 1
         return conflict
+    if salt.utils.test_mode(test=test, **kwargs):
+        opts['test'] = True
+    else:
+        opts['test'] = None
     st_ = salt.state.HighState(__opts__)
     st_.push_active()
     st_.opts['state_top'] = os.path.join('salt://', topfn)
     try:
-        ret = st_.call_highstate()
+        ret = st_.call_highstate(
+                exclude=kwargs.get('exclude', []),
+                cache=kwargs.get('cache', None),
+                cache_name=kwargs.get('cache_name', 'highstate')
+                )
     finally:
         st_.pop_active()
     _set_retcode(ret)
@@ -455,4 +481,27 @@ def single(fun, name, test=None, kwval_as='yaml', **kwargs):
     ret = {'{0[state]}_|-{0[__id__]}_|-{0[name]}_|-{0[fun]}'.format(kwargs):
             st_.call(kwargs)}
     _set_retcode(ret)
+    return ret
+
+
+def clear_cache():
+    '''
+    Clear out cached state files, forcing even cache runs to refresh the cache
+    on the next state execution.
+
+    Remember that the state cache is completely disabled by default, this
+    execution only applies if cache=True is used in states
+
+    CLI Example::
+
+        salt '*' state.clear_cache
+    '''
+    ret = []
+    for fn_ in os.listdir(__opts__['cachedir']):
+        if fn_.endswith('.cache.p'):
+            path = os.path.join(__opts__['cachedir'], fn_)
+            if not os.path.isfile(path):
+                continue
+            os.remove(path)
+            ret.append(fn_)
     return ret
