@@ -817,7 +817,7 @@ def check_ipc_path_max_len(uri):
         )
 
 
-def check_state_result(self, running):
+def check_state_result(running):
     '''
     Check the total return value of the run and determine if the running
     dict has any issues
@@ -905,3 +905,23 @@ def rm_rf(path):
             raise
 
     shutil.rmtree(path, onerror=_onerror)
+
+def option(
+        value,
+        default='',
+        opts=None,
+        pillar=None):
+    '''
+    Pass in a generic option and receive the value that will be assigned
+    '''
+    if opts is None:
+        opts = {}
+    if pillar is None:
+        pillar = {}
+    if value in opts:
+        return opts[value]
+    if value in pillar.get('master', {}):
+        return pillar['master'][value]
+    if value in pillar:
+        return pillar[value]
+    return default

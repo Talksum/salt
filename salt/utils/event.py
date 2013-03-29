@@ -35,6 +35,13 @@ import salt.utils
 from salt._compat import string_types
 log = logging.getLogger(__name__)
 
+# The SUB_EVENT set is for functions that require events fired based on
+# component executions, like the state system
+SUB_EVENT = set([
+            'state.highstate',
+            'state.sls',
+            ])
+
 
 class SaltEvent(object):
     '''
@@ -193,6 +200,26 @@ class SaltEvent(object):
             self.poller.unregister(socket)
         if self.context.closed is False:
             self.context.term()
+
+    def fire_ret_load(self, load):
+        '''
+        Fire events based on information in the return load
+        '''
+        if load.get('retcode') and load.get('fun'):
+            # Minion fired a bad retcode, fire an event
+            if load['fun'] in SUB_EVENT:
+                try:
+                    for tag, data in load.get('return', {}).items():
+                        tag = tag.split('_|-')
+                        if data.get('result') is False:
+                            self.fire_event(
+                                    data,
+                                    '{0}.{1}'.format(tag[0], tag[-1])
+                                    )
+                except Exception:
+                    pass
+            else:
+                self.fire_event(load, load['fun'])
 
     def __del__(self):
         self.destroy()

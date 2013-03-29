@@ -417,7 +417,7 @@ class Minion(object):
                 args, kwargs = detect_kwargs(func, data['arg'], data)
                 sys.modules[func.__module__].__context__['retcode'] = 0
                 ret['return'] = func(*args, **kwargs)
-                ret['retcode'] = sys.modules[func.__module__].__context__['retcode']
+                ret['retcode'] = sys.modules[func.__module__].__context__.get('retcode', 0)
                 ret['success'] = True
             except CommandNotFoundError as exc:
                 msg = 'Command required for \'{0}\' not found: {1}'
@@ -540,18 +540,15 @@ class Minion(object):
         sreq = salt.payload.SREQ(self.opts['master_uri'])
         if ret_cmd == '_syndic_return':
             load = {'cmd': ret_cmd,
-                    'jid': ret['jid'],
                     'id': self.opts['id']}
             load['return'] = {}
             for key, value in ret.items():
-                if key == 'jid' or key == 'fun':
-                    continue
                 load['return'][key] = value
         else:
-            load = {'return': ret['return'],
-                    'cmd': ret_cmd,
-                    'jid': ret['jid'],
+            load = {'cmd': ret_cmd,
                     'id': self.opts['id']}
+            for key, value in ret.items():
+                load[key] = value
         try:
             if hasattr(self.functions[ret['fun']], '__outputter__'):
                 oput = self.functions[ret['fun']].__outputter__
