@@ -32,6 +32,7 @@ def _create_loader(
     Creates Loader instance
 
     Order of module_dirs:
+        cli flag -m MODULE_DIRS
         opts[ext_type_dirs],
         extension types,
         base types.
@@ -49,7 +50,21 @@ def _create_loader(
         if ext_type_dirs in opts:
             ext_type_types.extend(opts[ext_type_dirs])
 
-    module_dirs = ext_type_types + [ext_types, sys_types]
+    cli_module_dirs = []
+    # The dirs can be any module dir, or a in-tree _{ext_type} dir
+    for _dir in opts.get('module_dirs', []):
+        # Prepend to the list to match cli argument ordering
+        maybe_dir = os.path.join(_dir, ext_type)
+        if (os.path.isdir(maybe_dir)):
+            cli_module_dirs.insert(0, maybe_dir)
+            continue
+
+        maybe_dir = os.path.join(_dir, '_{0}'.format(ext_type))
+        if (os.path.isdir(maybe_dir)):
+            cli_module_dirs.insert(0, maybe_dir)
+
+
+    module_dirs = cli_module_dirs + ext_type_types + [ext_types, sys_types]
     _generate_module('{0}.int'.format(LOADED_BASE_NAME))
     _generate_module('{0}.int.{1}'.format(LOADED_BASE_NAME, tag))
     _generate_module('{0}.ext'.format(LOADED_BASE_NAME))
@@ -103,7 +118,7 @@ def returners(opts, functions, whitelist=None):
 
 def pillars(opts, functions):
     '''
-    Returns the returner modules
+    Returns the pillars modules
     '''
     load = _create_loader(opts, 'pillar', 'pillar')
     pack = {'name': '__salt__',
@@ -113,7 +128,7 @@ def pillars(opts, functions):
 
 def tops(opts):
     '''
-    Returns the returner modules
+    Returns the tops modules
     '''
     if not 'master_tops' in opts:
         return {}
@@ -124,7 +139,7 @@ def tops(opts):
 
 def wheels(opts, whitelist=None):
     '''
-    Returns the returner modules
+    Returns the wheels modules
     '''
     load = _create_loader(opts, 'wheel', 'wheel')
     return load.gen_functions(whitelist=whitelist)
@@ -132,7 +147,7 @@ def wheels(opts, whitelist=None):
 
 def outputters(opts):
     '''
-    Returns the returner modules
+    Returns the outputters modules
     '''
     load = _create_loader(
         opts,
@@ -144,7 +159,7 @@ def outputters(opts):
 
 def auth(opts, whitelist=None):
     '''
-    Returns the returner modules
+    Returns the auth modules
     '''
     load = _create_loader(opts, 'auth', 'auth')
     return load.gen_functions(whitelist=whitelist)
@@ -171,7 +186,7 @@ def states(opts, functions, whitelist=None):
 
 def search(opts, returners, whitelist=None):
     '''
-    Returns the state modules
+    Returns the search modules
     '''
     load = _create_loader(opts, 'search', 'search')
     pack = {'name': '__ret__',
