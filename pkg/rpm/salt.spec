@@ -22,7 +22,7 @@ Source3: %{name}-minion
 #Source4: %{name}-master.service
 #Source5: %{name}-syndic.service
 #Source6: %{name}-minion.service
-Source7: README.fedora
+#Source7: README.fedora
 Source8: salt-defaults
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -81,7 +81,7 @@ Requires: salt = %{version}-%{release}
 Salt minion is queried and controlled from the master.
 
 %prep
-%setup -q
+%setup -c
 
 %build
 
@@ -94,7 +94,7 @@ install -p %{SOURCE1} $RPM_BUILD_ROOT%{_initrddir}/
 install -p %{SOURCE2} $RPM_BUILD_ROOT%{_initrddir}/
 install -p %{SOURCE3} $RPM_BUILD_ROOT%{_initrddir}/
 
-install -p %{SOURCE7} .
+#install -p %{SOURCE7} .
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/salt/
 install -p -m 0640 conf/minion $RPM_BUILD_ROOT%{_sysconfdir}/salt/minion
@@ -113,7 +113,7 @@ rm -rf $RPM_BUILD_ROOT
 %{python_sitelib}/%{name}-*-py?.?.egg-info
 %{_sysconfdir}/default/salt
 %doc %{_mandir}/man7/salt.7
-%doc README.fedora
+#%doc README.fedora
 
 %files -n salt-minion
 %defattr(-,root,root)
