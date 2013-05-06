@@ -42,8 +42,8 @@ _ETHTOOL_CONFIG_OPTS = [
     'gso', 'gro', 'lro'
 ]
 _RH_CONFIG_OPTS = [
-    'domain', 'peerdns', 'defaultroute',
-    'mtu', 'static-routes'
+    'domain', 'peerdns', 'defroute',
+    'mtu', 'static-routes', 'gateway'
 ]
 _RH_CONFIG_BONDING_OPTS = [
     'mode', 'miimon', 'arp_interval',
@@ -113,9 +113,9 @@ def _parse_rh_config(path):
 
 def _parse_ethtool_opts(opts, iface):
     '''
-    Fiters given options and outputs valid settings for ETHTOOLS_OPTS
+    Filters given options and outputs valid settings for ETHTOOLS_OPTS
     If an option has a value that is not expected, this
-    fuction will log what the Interface, Setting and what it was
+    function will log what the Interface, Setting and what it was
     expecting.
     '''
     config = {}
@@ -164,9 +164,9 @@ def _parse_ethtool_opts(opts, iface):
 
 def _parse_settings_bond(opts, iface):
     '''
-    Fiters given options and outputs valid settings for requested
+    Filters given options and outputs valid settings for requested
     operation. If an option has a value that is not expected, this
-    fuction will log what the Interface, Setting and what it was
+    function will log what the Interface, Setting and what it was
     expecting.
     '''
 
@@ -254,9 +254,9 @@ def _parse_settings_bond(opts, iface):
 
 def _parse_settings_bond_0(opts, iface, bond_def):
     '''
-    Fiters given options and outputs valid settings for bond0.
+    Filters given options and outputs valid settings for bond0.
     If an option has a value that is not expected, this
-    fuction will log what the Interface, Setting and what it was
+    function will log what the Interface, Setting and what it was
     expecting.
     '''
     bond = {'mode': '0'}
@@ -292,9 +292,9 @@ def _parse_settings_bond_0(opts, iface, bond_def):
 def _parse_settings_bond_1(opts, iface, bond_def):
 
     '''
-    Fiters given options and outputs valid settings for bond1.
+    Filters given options and outputs valid settings for bond1.
     If an option has a value that is not expected, this
-    fuction will log what the Interface, Setting and what it was
+    function will log what the Interface, Setting and what it was
     expecting.
     '''
     bond = {'mode': '1'}
@@ -327,9 +327,9 @@ def _parse_settings_bond_1(opts, iface, bond_def):
 
 def _parse_settings_bond_2(opts, iface, bond_def):
     '''
-    Fiters given options and outputs valid settings for bond2.
+    Filters given options and outputs valid settings for bond2.
     If an option has a value that is not expected, this
-    fuction will log what the Interface, Setting and what it was
+    function will log what the Interface, Setting and what it was
     expecting.
     '''
 
@@ -375,9 +375,9 @@ def _parse_settings_bond_2(opts, iface, bond_def):
 def _parse_settings_bond_3(opts, iface, bond_def):
 
     '''
-    Fiters given options and outputs valid settings for bond3.
+    Filters given options and outputs valid settings for bond3.
     If an option has a value that is not expected, this
-    fuction will log what the Interface, Setting and what it was
+    function will log what the Interface, Setting and what it was
     expecting.
     '''
     bond = {'mode': '3'}
@@ -388,7 +388,7 @@ def _parse_settings_bond_3(opts, iface, bond_def):
                 int(opts[binding])
                 bond.update({binding: opts[binding]})
             except Exception:
-                _raise_error_iface(iface, binding, ['interger'])
+                _raise_error_iface(iface, binding, ['integer'])
         else:
             _log_default_iface(iface, binding, bond_def[binding])
             bond.update({binding: bond_def[binding]})
@@ -410,9 +410,9 @@ def _parse_settings_bond_3(opts, iface, bond_def):
 
 def _parse_settings_bond_4(opts, iface, bond_def):
     '''
-    Fiters given options and outputs valid settings for bond4.
+    Filters given options and outputs valid settings for bond4.
     If an option has a value that is not expected, this
-    fuction will log what the Interface, Setting and what it was
+    function will log what the Interface, Setting and what it was
     expecting.
     '''
 
@@ -462,9 +462,9 @@ def _parse_settings_bond_4(opts, iface, bond_def):
 def _parse_settings_bond_5(opts, iface, bond_def):
 
     '''
-    Fiters given options and outputs valid settings for bond5.
+    Filters given options and outputs valid settings for bond5.
     If an option has a value that is not expected, this
-    fuction will log what the Interface, Setting and what it was
+    function will log what the Interface, Setting and what it was
     expecting.
     '''
     bond = {'mode': '5'}
@@ -498,9 +498,9 @@ def _parse_settings_bond_5(opts, iface, bond_def):
 def _parse_settings_bond_6(opts, iface, bond_def):
 
     '''
-    Fiters given options and outputs valid settings for bond6.
+    Filters given options and outputs valid settings for bond6.
     If an option has a value that is not expected, this
-    fuction will log what the Interface, Setting and what it was
+    function will log what the Interface, Setting and what it was
     expecting.
     '''
     bond = {'mode': '6'}
@@ -533,7 +533,7 @@ def _parse_settings_bond_6(opts, iface, bond_def):
 
 def _parse_settings_eth(opts, iface_type, enabled, iface):
     '''
-    Fiters given options and outputs valid settings for a
+    Filters given options and outputs valid settings for a
     network interface.
     '''
     result = {'name': iface}
@@ -546,7 +546,7 @@ def _parse_settings_eth(opts, iface_type, enabled, iface):
 
     if 'dns' in opts:
         result['dns'] = opts['dns']
-        result['peernds'] = 'yes'
+        result['peerdns'] = 'yes'
 
     if iface_type not in ['bridge']:
         ethtool = _parse_ethtool_opts(opts, iface)
@@ -596,12 +596,12 @@ def _parse_settings_eth(opts, iface_type, enabled, iface):
         if 'bridge' in opts:
             result['bridge'] = opts['bridge']
 
-    for opt in ['ipaddr', 'master', 'netmask', 'srcaddr', 'delay']:
+    for opt in ['ipaddr', 'master', 'netmask', 'srcaddr', 'delay', 'domain', 'gateway']:
         if opt in opts:
             result[opt] = opts[opt]
 
     valid = _CONFIG_TRUE + _CONFIG_FALSE
-    for opt in ['peerdns', 'slave', 'vlan']:
+    for opt in ['peerdns', 'slave', 'vlan', 'defroute']:
         if opt in opts:
             if opts[opt] in _CONFIG_TRUE:
                 result[opt] = 'yes'

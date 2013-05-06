@@ -6,7 +6,7 @@ Author: Jed Glazner
 Version: 0.2.1
 Modified: 12/09/2011
 
-This module uses http requests to talk to the apache solr request handlers
+This module uses HTTP requests to talk to the apache solr request handlers
 to gather information and report errors. Because of this the minion doesn't
 necessarily need to reside on the actual slave.  However if you want to
 use the signal function the minion must reside on the physical solr host.
@@ -29,9 +29,9 @@ solr.cores
     A list of core names eg ['core1','core2'].
     An empty list indicates non-multicore setup.
 solr.baseurl
-    The root level url to access solr via http
+    The root level URL to access solr via HTTP
 solr.request_timeout
-    The number of seconds before timing out an http/https/ftp request. If
+    The number of seconds before timing out an HTTP/HTTPS/FTP request. If
     nothing is specified then the python global timeout setting is used.
 solr.type
     Possible values are 'master' or 'slave'
@@ -44,7 +44,7 @@ solr.num_backups
 solr.init_script
     The full path to your init script with start/stop options
 solr.dih.options
-    A list of options to pass to the dih.
+    A list of options to pass to the DIH.
 
 Required Options for DIH
 ------------------------
@@ -185,7 +185,7 @@ def _update_return_dict(ret, success, data, errors=None, warnings=None):
 def _format_url(handler, host=None, core_name=None, extra=None):
     '''
     PRIVATE METHOD
-    Formats the url based on parameters, and if cores are used or not
+    Formats the URL based on parameters, and if cores are used or not
 
     handler : str
         The request handler to hit.
@@ -198,7 +198,7 @@ def _format_url(handler, host=None, core_name=None, extra=None):
         A list of name value pairs in string format. eg ['name=value']
 
     Return: str
-        Fully formatted url (http://<host>:<port>/solr/<handler>?wt=json&<extra>)
+        Fully formatted URL (http://<host>:<port>/solr/<handler>?wt=json&<extra>)
     '''
     extra = [] if extra is None else extra
     if _get_none_or_value(host) is None or host == 'None':
@@ -224,10 +224,10 @@ def _format_url(handler, host=None, core_name=None, extra=None):
 def _http_request(url, request_timeout=None):
     '''
     PRIVATE METHOD
-    Uses json.load to fetch the json results from the solr api.
+    Uses json.load to fetch the JSON results from the solr API.
 
     url : str
-        a complete url that can be passed to urllib.open
+        a complete URL that can be passed to urllib.open
     request_timeout : int (None)
         The number of seconds before the timeout should fail. Leave blank/None
         to use the default. __opts__['solr.request_timeout']
@@ -252,7 +252,7 @@ def _replication_request(command, host=None, core_name=None, params=None):
     '''
     PRIVATE METHOD
     Performs the requested replication command and returns a dictionary with
-    success, errors and data as keys. The data object will contain the json
+    success, errors and data as keys. The data object will contain the JSON
     response.
 
     command : str
@@ -283,7 +283,7 @@ def _get_admin_info(command, host=None, core_name=None):
     Calls the _http_request method and passes the admin command to execute
     and stores the data. This data is fairly static but should be refreshed
     periodically to make sure everything this OK. The data object will contain
-    the json response.
+    the JSON response.
 
     command : str
         The admin command to execute.
@@ -392,8 +392,8 @@ def _find_value(ret_dict, key, path=None):
     Traverses a dictionary of dictionaries/lists to find key
     and return the value stored.
     TODO:// this method doesn't really work very well, and it's not really
-            very useful in it's current state. The purpose for this method is
-            to simplify parsing the json output so you can just pass the key
+            very useful in its current state. The purpose for this method is
+            to simplify parsing the JSON output so you can just pass the key
             you want to find and have it return the value.
     ret : dict<str,obj>
         The dictionary to search through. Typically this will be a dict
@@ -517,7 +517,7 @@ def optimize(host=None, core_name=None):
     If you are running a single solr instance, or if you are going to run
     this on a slave be aware than search performance will be horrible
     while this command is being run. Additionally it can take a LONG time
-    to run and your http request may timeout. If that happens adjust your
+    to run and your HTTP request may timeout. If that happens adjust your
     timeout settings.
 
     host : str (None)
@@ -638,7 +638,7 @@ def is_replication_enabled(host=None, core_name=None):
                 enabled = slave['masterDetails']['master'][
                     'replicationEnabled']
                 #if replication is turned off on the master, or polling is
-                #disabled we need to return false. These may not not errors,
+                #disabled we need to return false. These may not be errors,
                 #but the purpose of this call is to check to see if the slaves
                 #can replicate.
             if enabled == 'false':
@@ -794,7 +794,7 @@ def replication_details(host=None, core_name=None):
 def backup(host=None, core_name=None, append_core_to_path=False):
     '''
     Tell solr make a backup.  This method can be mis-leading since it uses the
-    backup api.  If an error happens during the backup you are not notified.
+    backup API.  If an error happens during the backup you are not notified.
     The status: 'OK' in the response simply means that solr received the
     request successfully.
 
@@ -1095,7 +1095,7 @@ def abort_import(handler, host=None, core_name=None, verbose=False):
     '''
     MASTER ONLY
     Aborts an existing import command to the specified handler.
-    This command can only be run if the minion is is configured with
+    This command can only be run if the minion is configured with
     solr.type=master
 
     handler : str
@@ -1134,7 +1134,7 @@ def full_import(handler, host=None, core_name=None, options=None, extra=None):
     '''
     MASTER ONLY
     Submits an import command to the specified handler using specified options.
-    This command can only be run if the minion is is configured with
+    This command can only be run if the minion is configured with
     solr.type=master
 
     handler : str
@@ -1188,7 +1188,7 @@ def full_import(handler, host=None, core_name=None, options=None, extra=None):
 def delta_import(handler, host=None, core_name=None, options=None, extra=None):
     '''
     Submits an import command to the specified handler using specified options.
-    This command can only be run if the minion is is configured with
+    This command can only be run if the minion is configured with
     solr.type=master
 
     handler : str
@@ -1240,7 +1240,7 @@ def delta_import(handler, host=None, core_name=None, options=None, extra=None):
 def import_status(handler, host=None, core_name=None, verbose=False):
     '''
     Submits an import command to the specified handler using specified options.
-    This command can only be run if the minion is is configured with
+    This command can only be run if the minion is configured with
     solr.type: 'master'
 
     handler : str

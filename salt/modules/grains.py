@@ -48,7 +48,7 @@ _SANITIZERS = {
 
 def get(key, default=''):
     '''
-    Attempt to retrive the named value from grains, if the named value is not
+    Attempt to retrieve the named value from grains, if the named value is not
     available return the passed default. The default return is an empty string.
 
     The value can also represent a value in a nested dict using a ":" delimiter
@@ -56,7 +56,7 @@ def get(key, default=''):
 
     {'pkg': {'apache': 'httpd'}}
 
-    To retrive the value associated with the apache key in the pkg dict this
+    To retrieve the value associated with the apache key in the pkg dict this
     key can be passed:
 
     pkg:apache
@@ -140,11 +140,17 @@ def setval(key, val):
             __opts__['conf_file'],
             'grains'
         )
+    else:
+        gfn = os.path.join(
+            os.path.dirname(__opts__['conf_file']),
+            'grains'
+        )
+
     if os.path.isfile(gfn):
         with open(gfn, 'rb') as fp_:
             try:
                 grains = yaml.safe_load(fp_.read())
-            except Exception, e:
+            except Exception as e:
                 return 'Unable to read existing grains file: {0}'.format(e)
         if not isinstance(grains, dict):
             grains = {}

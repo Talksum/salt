@@ -12,6 +12,8 @@ import os
 # Import salt libs
 import salt.utils
 
+log = logging.getLogger(__name__)
+
 # Import upstart module if needed
 HAS_UPSTART = False
 if salt.utils.which('initctl'):
@@ -26,7 +28,6 @@ if salt.utils.which('initctl'):
     else:
         HAS_UPSTART = True
 
-log = logging.getLogger(__name__)
 
 
 def __virtual__():
@@ -43,10 +44,11 @@ def __virtual__():
         'Fedora',
         'ALT',
         'OEL',
+        'SUSE  Enterprise Server'
     ]
     if __grains__['os'] in enable:
         if __grains__['os'] == 'Fedora':
-            if __grains__['osrelease'] > 15:
+            if __grains__.get('osrelease', 0) > 15:
                 return False
         return 'service'
     return False
@@ -113,13 +115,19 @@ def _services():
     Return a dict of services and their types (sysv or upstart), as well
     as whether or not the service is enabled.
     '''
+    if 'service.all' in __context__:
+        return __context__['service.all']
+
     # First, parse sysvinit services from chkconfig
     rlevel = _runlevel()
     ret = {}
     for line in __salt__['cmd.run']('/sbin/chkconfig --list').splitlines():
         cols = line.split()
-        name = cols[0]
-        if not cols or name in ret:
+        try:
+            name = cols[0]
+        except IndexError:
+            continue
+        if name in ret:
             continue
         ret.setdefault(name, {})['type'] = 'sysvinit'
         ret[name]['enabled'] = _sysv_is_enabled(cols, rlevel)
@@ -130,6 +138,7 @@ def _services():
                 continue
             ret.setdefault(name, {})['type'] = 'upstart'
             ret[name]['enabled'] = _upstart_is_enabled(name)
+    __context__['service.all'] = ret
     return ret
 
 
@@ -251,7 +260,7 @@ def status(name, sig=None):
     '''
     if _service_is_upstart(name):
         cmd = 'status {0}'.format(name)
-        return 'start/running' in __salt___['cmd.run'](cmd)
+        return 'start/running' in __salt__['cmd.run'](cmd)
     _add_custom_initscript(name)
     if sig:
         return bool(__salt__['status.pid'](sig))

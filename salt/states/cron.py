@@ -4,13 +4,13 @@ Management of cron, the Unix command scheduler.
 
 The cron state module allows for user crontabs to be cleanly managed.
 
-Cron declarations require a number of parameters. The timing parameters, need
-to be declared, minute, hour, daymonth, month and dayweek. The  user who's
+Cron declarations require a number of parameters. The timing parameters need
+to be declared: minute, hour, daymonth, month, and dayweek. The user whose
 crontab is to be edited also needs to be defined.
 
-By default the timing arguments are all ``*`` and the user is root. When
-making changes to an existing cron job the name declaration is the unique
-factor, so if and existing cron that looks like this:
+By default, the timing arguments are all ``*`` and the user is root. When
+making changes to an existing cron job, the name declaration is the unique
+factor, so if an existing cron that looks like this:
 
 .. code-block:: yaml
 
@@ -47,11 +47,11 @@ def _check_cron(cmd, user, minute, hour, dom, month, dow):
     lst = __salt__['cron.list_tab'](user)
     for cron in lst['crons']:
         if cmd == cron['cmd']:
-            if not str(minute) == cron['min'] or \
-                    not str(hour) == cron['hour'] or \
-                    not str(dom) == cron['daymonth'] or \
-                    not str(month) == cron['month'] or \
-                    not str(dow) == cron['dayweek']:
+            if str(minute) != cron['min'] or \
+                    str(hour) != cron['hour'] or \
+                    str(dom) != cron['daymonth'] or \
+                    str(month) != cron['month'] or \
+                    str(dow) != cron['dayweek']:
                 return 'update'
             return 'present'
     return 'absent'
@@ -88,7 +88,7 @@ def present(name,
     '''
     Verifies that the specified cron job is present for the specified user.
     For more advanced information about what exactly can be set in the cron
-    timing parameters check your cron system's documentation. Most Unix-like
+    timing parameters, check your cron system's documentation. Most Unix-like
     systems' cron documentation can be found via the crontab man page:
     ``man 5 crontab``.
 
@@ -114,8 +114,7 @@ def present(name,
         The information to be set in the month section. Default is ``*``
 
     dayweek
-        The information to be set in the day of day of week section. Default is
-        ``*``
+        The information to be set in the day of week section. Default is ``*``
     '''
     name = ' '.join(name.strip().split())
     ret = {'changes': {},
@@ -175,7 +174,7 @@ def absent(name,
            month='*',
            dayweek='*'):
     '''
-    Verifies that the specified cron job is absent for the specified user, only
+    Verifies that the specified cron job is absent for the specified user; only
     the name is matched when removing a cron job.
 
     name
@@ -200,8 +199,7 @@ def absent(name,
         The information to be set in the month section. Default is ``*``
 
     dayweek
-        The information to be set in the day of day of week section. Default is
-        ``*``
+        The information to be set in the day of week section. Default is ``*``
     '''
     name = ' '.join(name.strip().split())
     ret = {'name': name,
@@ -263,12 +261,12 @@ def file(name,
 
     name
         The source file to be used as the crontab. This source file can be
-        hosted on either the salt master server, or on an http or ftp server.
+        hosted on either the salt master server, or on an HTTP or FTP server.
         For files hosted on the salt file server, if the file is located on
         the master in the directory named spam, and is called eggs, the source
         string is salt://spam/eggs.
 
-        If the file is hosted on a http or ftp server then the source_hash
+        If the file is hosted on a HTTP or FTP server then the source_hash
         argument is also required
 
     source_hash
@@ -278,7 +276,7 @@ def file(name,
         md5=e138491e9d5b97023cea823fe17bac22
 
     user
-        The user to whome the crontab should be assigned. This defaults to
+        The user to whom the crontab should be assigned. This defaults to
         root.
 
     template

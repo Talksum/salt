@@ -12,6 +12,7 @@ import logging
 import copy
 
 # Import salt libs
+import salt.utils
 from salt._compat import string_types
 
 log = logging.getLogger(__name__)
@@ -22,15 +23,20 @@ def __virtual__():
     Set the user module if the kernel is Linux or OpenBSD
     and remove some of the functionality on OS X
     '''
+    # XXX: Why are these imports in __virtual__?
     import sys
     from salt._compat import callable
     if __grains__['kernel'] == 'Darwin':
         mod = sys.modules[__name__]
         for attr in dir(mod):
             if callable(getattr(mod, attr)):
-                if not attr in ('_format_info', 'getent', 'info', 'list_groups', 'list_users', '__virtual__'):
+                if not attr in ('_format_info', 'getent', 'info',
+                                'list_groups', 'list_users', '__virtual__'):
                     delattr(mod, attr)
-    return 'user' if __grains__['kernel'] in ('Linux', 'Darwin', 'OpenBSD') else False
+    return (
+        'user' if __grains__['kernel'] in ('Linux', 'Darwin', 'OpenBSD')
+        else False
+    )
 
 
 def _get_gecos(name):
@@ -91,14 +97,12 @@ def add(name,
         def usergroups():
             retval = False
             try:
-                for line in open("/etc/login.defs"):
-                    if "USERGROUPS_ENAB" in line[:15]:
+                for line in salt.utils.fopen('/etc/login.defs'):
+                    if 'USERGROUPS_ENAB' in line[:15]:
                         if "yes" in line:
                             retval = True
             except Exception:
-                import traceback
-                log.debug("Error reading /etc/login.defs")
-                log.debug(traceback.format_exc())
+                log.debug('Error reading /etc/login.defs', exc_info=True)
             return retval
         if usergroups():
             cmd += '-g {0} '.format(__salt__['file.group_to_gid'](name))
@@ -163,7 +167,7 @@ def delete(name, remove=False, force=False):
     return not ret['retcode']
 
 
-def getent(user=None):
+def getent():
     '''
     Return the list of all info for all users
 
@@ -171,17 +175,13 @@ def getent(user=None):
 
         salt '*' user.getent
     '''
-    if 'useradd_getent' in __context__:
-        return __context__['useradd_getent']
+    if 'user.getent' in __context__:
+        return __context__['user.getent']
 
     ret = []
     for data in pwd.getpwall():
         ret.append(_format_info(data))
-    if user:
-        try:
-            ret = [x for x in ret if x.get('name', '') == user][0]
-        except IndexError:
-            ret = {}
+    __context__['user.getent'] = ret
     return ret
 
 
@@ -390,22 +390,10 @@ def info(name):
 
         salt '*' user.info root
     '''
-    ret = {}
     try:
         data = pwd.getpwnam(name)
     except KeyError:
-        ret['gid'] = ''
-        ret['groups'] = ''
-        ret['home'] = ''
-        ret['name'] = ''
-        ret['passwd'] = ''
-        ret['shell'] = ''
-        ret['uid'] = ''
-        ret['fullname'] = ''
-        ret['roomnumber'] = ''
-        ret['workphone'] = ''
-        ret['homephone'] = ''
-        return ret
+        return {}
     else:
         return _format_info(data)
 
@@ -421,7 +409,7 @@ def _format_info(data):
         gecos_field.append('')
 
     return {'gid': data.pw_gid,
-            'groups': list_groups(data.pw_name,),
+            'groups': list_groups(data.pw_name),
             'home': data.pw_dir,
             'name': data.pw_name,
             'passwd': data.pw_passwd,
@@ -452,11 +440,11 @@ def list_groups(name):
         pass
 
     # If we already grabbed the group list, it's overkill to grab it again
-    if 'useradd_getgrall' in __context__:
-        groups = __context__['useradd_getgrall']
+    if 'user.getgrall' in __context__:
+        groups = __context__['user.getgrall']
     else:
         groups = grp.getgrall()
-        __context__['useradd_getgrall'] = groups
+        __context__['user.getgrall'] = groups
 
     # Now, all other groups the user belongs to
     for group in groups:

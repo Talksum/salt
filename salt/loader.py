@@ -9,7 +9,6 @@ import sys
 import salt
 import logging
 import tempfile
-import traceback
 
 # Import salt libs
 from salt.exceptions import LoaderError
@@ -27,7 +26,9 @@ def _create_loader(
         tag,
         ext_dirs=True,
         ext_type_dirs=None,
-        base_path=None):
+        base_path=None,
+        loaded_base_name=None,
+        mod_type_check=None):
     '''
     Creates Loader instance
 
@@ -63,13 +64,24 @@ def _create_loader(
         if (os.path.isdir(maybe_dir)):
             cli_module_dirs.insert(0, maybe_dir)
 
+    if loaded_base_name is None:
+        loaded_base_name = LOADED_BASE_NAME
+
+    if mod_type_check is None:
+        mod_type_check = _mod_type
 
     module_dirs = cli_module_dirs + ext_type_types + [ext_types, sys_types]
-    _generate_module('{0}.int'.format(LOADED_BASE_NAME))
-    _generate_module('{0}.int.{1}'.format(LOADED_BASE_NAME, tag))
-    _generate_module('{0}.ext'.format(LOADED_BASE_NAME))
-    _generate_module('{0}.ext.{1}'.format(LOADED_BASE_NAME, tag))
-    return Loader(module_dirs, opts, tag)
+    _generate_module('{0}.int'.format(loaded_base_name))
+    _generate_module('{0}.int.{1}'.format(loaded_base_name, tag))
+    _generate_module('{0}.ext'.format(loaded_base_name))
+    _generate_module('{0}.ext.{1}'.format(loaded_base_name, tag))
+    return Loader(
+        module_dirs,
+        opts,
+        tag,
+        loaded_base_name=loaded_base_name,
+        mod_type_check=mod_type_check
+    )
 
 
 def minion_mods(opts, context=None, whitelist=None):
@@ -310,7 +322,8 @@ class Loader(object):
     also be used to only load specific functions from a directory, or to
     call modules in an arbitrary directory directly.
     '''
-    def __init__(self, module_dirs, opts=dict(), tag='module'):
+    def __init__(self, module_dirs, opts=dict(), tag='module',
+                 loaded_base_name=None, mod_type_check=None):
         self.module_dirs = module_dirs
         if '_' in tag:
             raise LoaderError('Cannot tag loader with an "_"')
@@ -324,6 +337,8 @@ class Loader(object):
         else:
             self.pillar = {}
         self.opts = self.__prep_mod_opts(opts)
+        self.loaded_base_name = loaded_base_name or LOADED_BASE_NAME
+        self.mod_type_check = mod_type_check or _mod_type
 
     def __prep_mod_opts(self, opts):
         '''
@@ -406,23 +421,27 @@ class Loader(object):
                 fn_, path, desc = imp.find_module(name, self.module_dirs)
                 mod = imp.load_module(
                     '{0}.{1}.{2}.{3}'.format(
-                        LOADED_BASE_NAME, _mod_type(path), self.tag, name
+                        self.loaded_base_name,
+                        self.mod_type_check(path),
+                        self.tag,
+                        name
                     ), fn_, path, desc
                 )
-        except ImportError as exc:
+        except ImportError:
             log.debug(
-                'Failed to import {0} {1}: {2}'.format(
-                    self.tag, name, exc
-                )
+                'Failed to import {0} {1}:\n'.format(
+                    self.tag, name
+                ),
+                exc_info=True
             )
             return mod
         except Exception:
-            trb = traceback.format_exc()
             log.warning(
                 'Failed to import {0} {1}, this is due most likely to a '
-                'syntax error: {2}'.format(
-                    self.tag, name, trb
-                )
+                'syntax error:\n'.format(
+                    self.tag, name
+                ),
+                exc_info=True
             )
             return mod
         if hasattr(mod, '__opts__'):
@@ -473,6 +492,13 @@ class Loader(object):
                 self._apply_outputter(func, mod)
         if not hasattr(mod, '__salt__'):
             mod.__salt__ = functions
+        try:
+            context = sys.modules[
+                functions[functions.keys()[0]].__module__
+            ].__context__
+        except AttributeError:
+            context = {}
+        mod.__context__ = context
         return funcs
 
     def gen_functions(self, pack=None, virtual_enable=True, whitelist=None):
@@ -545,8 +571,8 @@ class Loader(object):
                     # cython_enabled is True. Continue...
                     mod = pyximport.load_module(
                         '{0}.{1}.{2}.{3}'.format(
-                            LOADED_BASE_NAME,
-                            _mod_type(names[name]),
+                            self.loaded_base_name,
+                            self.mod_type_check(names[name]),
                             self.tag,
                             name
                         ), names[name], tempfile.gettempdir()
@@ -555,7 +581,10 @@ class Loader(object):
                     fn_, path, desc = imp.find_module(name, self.module_dirs)
                     mod = imp.load_module(
                         '{0}.{1}.{2}.{3}'.format(
-                            LOADED_BASE_NAME, _mod_type(path), self.tag, name
+                            self.loaded_base_name,
+                            self.mod_type_check(path),
+                            self.tag,
+                            name
                         ), fn_, path, desc
                     )
                     # reload all submodules if necessary
@@ -569,7 +598,7 @@ class Loader(object):
                     for submodule in submodules:
                         try:
                             smname = '{0}.{1}.{2}'.format(
-                                LOADED_BASE_NAME,
+                                self.loaded_base_name,
                                 self.tag,
                                 name
                             )
@@ -581,21 +610,22 @@ class Loader(object):
                                 reload(submodule)
                         except AttributeError:
                             continue
-            except ImportError as exc:
+            except ImportError:
                 log.debug(
                     'Failed to import {0} {1}, this is most likely NOT a '
-                    'problem: {2}'.format(
-                        self.tag, name, exc
-                    )
+                    'problem:\n'.format(
+                        self.tag, name
+                    ),
+                    exc_info=True
                 )
                 continue
             except Exception:
-                trb = traceback.format_exc()
                 log.warning(
                     'Failed to import {0} {1}, this is due most likely to a '
-                    'syntax error: {2}'.format(
-                        self.tag, name, trb
-                    )
+                    'syntax error. Traceback raised:\n'.format(
+                        self.tag, name
+                    ),
+                    exc_info=True
                 )
                 continue
             modules.append(mod)
@@ -686,8 +716,12 @@ class Loader(object):
                 except KeyError:
                     # Key errors come out of the virtual function when passing
                     # in incomplete grains sets, these can be safely ignored
-                    # and logged to debug
-                    log.debug('KeyError when loading {0}'.format(module_name))
+                    # and logged to debug, still, it includes the traceback to
+                    # help debugging.
+                    log.debug(
+                        'KeyError when loading {0}'.format(module_name),
+                        exc_info=True
+                    )
 
                 except Exception:
                     # If the module throws an exception during __virtual__()
@@ -789,7 +823,7 @@ class Loader(object):
         grains = {}
         funcs = self.gen_functions()
         for key, fun in funcs.items():
-            if not key[key.index('.') + 1:] == 'core':
+            if key[key.index('.') + 1:] != 'core':
                 continue
             ret = fun()
             if not isinstance(ret, dict):
@@ -801,12 +835,12 @@ class Loader(object):
             try:
                 ret = fun()
             except Exception:
-                trb = traceback.format_exc()
                 log.critical(
                     'Failed to load grains defined in grain file {0} in '
-                    'function {1}, error:\n{2}'.format(
-                        key, fun, trb
-                    )
+                    'function {1}, error:\n'.format(
+                        key, fun
+                    ),
+                    exc_info=True
                 )
                 continue
             if not isinstance(ret, dict):

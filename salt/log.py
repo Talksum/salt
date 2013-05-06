@@ -5,6 +5,10 @@
 
     This is where Salt's logging gets set up.
 
+    This module should be imported as soon as possible, preferably the first
+    module salt or any salt depending library imports so any new logging
+    logger instance uses our ``salt.log.SaltLoggingClass``.
+
 
     :copyright: 2011-2012 :email:`Pedro Algarvio (pedro@algarvio.me)`
     :license: Apache 2.0, see LICENSE for more details.
@@ -444,7 +448,7 @@ def setup_logfile_logger(log_path, log_level='error', log_format=None,
         try:
             # Et voilá! Finally our syslog handler instance
             handler = logging.handlers.SysLogHandler(**syslog_opts)
-        except socket.error, err:
+        except socket.error as err:
             logging.getLogger(__name__).error(
                 'Failed to setup the Syslog logging handler: {0}'.format(
                     err
@@ -457,8 +461,8 @@ def setup_logfile_logger(log_path, log_level='error', log_format=None,
     else:
         try:
             # Logfile logging is UTF-8 on purpose.
-            # Since salt uses yaml and yaml uses either UTF-8 or UTF-16, if a
-            # user is not using plain ascii, he's system should be ready to
+            # Since salt uses YAML and YAML uses either UTF-8 or UTF-16, if a
+            # user is not using plain ASCII, their system should be ready to
             # handle UTF-8.
             handler = getattr(
                 logging.handlers, 'WatchedFileHandler', logging.FileHandler

@@ -2,11 +2,12 @@
 Provide the service module for systemd
 '''
 # Import python libs
+import logging
 import os
 import re
 
-# Import salt libs
-import salt.utils
+log = logging.getLogger(__name__)
+
 
 LOCAL_CONFIG_PATH = '/etc/systemd/system'
 VALID_UNIT_TYPES = ['service', 'socket', 'device', 'mount', 'automount',
@@ -31,15 +32,10 @@ def _sd_booted():
         try:
             # This check does the same as sd_booted() from libsystemd-daemon:
             # http://www.freedesktop.org/software/systemd/man/sd_booted.html
-            cgroup_fs = os.stat('/sys/fs/cgroup')
-            cgroup_systemd = os.stat('/sys/fs/cgroup/systemd')
+            if os.stat('/run/systemd/system'):
+                __context__['systemd.sd_booted'] = True
         except OSError:
             __context__['systemd.sd_booted'] = False
-        else:
-            if cgroup_fs.st_dev != cgroup_systemd.st_dev:
-                __context__['systemd.sd_booted'] = True
-            else:
-                __context__['systemd.sd_booted'] = False
 
     return __context__['systemd.sd_booted']
 

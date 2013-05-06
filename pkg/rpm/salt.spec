@@ -8,8 +8,8 @@
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 
 Name: salt
-Version: 0.14.0
-Release: 4%{?dist}
+Version: 0.15.0
+Release: 1%{?dist}
 Summary: A parallel remote execution system
 
 Group:   System Environment/Daemons
@@ -176,6 +176,13 @@ rm -rf $RPM_BUILD_ROOT
   fi
 
 %changelog
+* Mon May 06 2013 Mike Chesnut <mikec@talksum.com> - 0.15.0-1
+- move to latest git head to get features from 0.15.0 release
+- add new tsalt daemons as part of TALK-424
+
+* Fri Apr 19 2013 Clint Savage <herlo1@gmail.com> - 0.14.1-1
+- Update to upstream patch release 0.14.1
+
 * Mon Mar 25 2013 Mike Chesnut <mikec@talksum.com> - 0.14.0-1
 - merge changes from upstream release 0.14.0
 - add handling of /etc/default/salt, and a default of this file for talkos env

@@ -68,6 +68,18 @@ def _set_retcode(ret):
         __context__['retcode'] = 2
 
 
+def _check_pillar(kwargs):
+    '''
+    Check the pillar for errors, refuse to run the state it there are errors
+    in the pillar and return the pillar errors
+    '''
+    if kwargs.get('force'):
+        return True
+    if '_errors' in __pillar__:
+        return False
+    return True
+
+
 def running():
     '''
     Return a dict of state return data if a state function is already running.
@@ -82,10 +94,11 @@ def running():
     active = __salt__['saltutil.is_running']('state.*')
     for data in active:
         err = ('The function "{0}" is running as PID {1} and was started at '
-               '{2} ').format(
+               '{2} with jid {3}').format(
                 data['fun'],
                 data['pid'],
                 salt.utils.jid_to_time(data['jid']),
+                data['jid'],
                 )
         ret.append(err)
     return ret
@@ -184,12 +197,20 @@ def highstate(test=None, **kwargs):
     if conflict:
         __context__['retcode'] = 1
         return conflict
+    if not _check_pillar(kwargs):
+        __context__['retcode'] = 5
+        err = ['Pillar failed to render with the following messages:']
+        err += __pillar__['_errors']
+        return err
     opts = copy.copy(__opts__)
 
     if salt.utils.test_mode(test=test, **kwargs):
         opts['test'] = True
     else:
         opts['test'] = None
+
+    if 'env' in kwargs:
+        opts['environment'] = kwargs['env']
 
     pillar = __resolve_struct(
             kwargs.get('pillar', ''),
@@ -237,6 +258,11 @@ def sls(mods, env='base', test=None, exclude=None, **kwargs):
     if conflict:
         __context__['retcode'] = 1
         return conflict
+    if not _check_pillar(kwargs):
+        __context__['retcode'] = 5
+        err = ['Pillar failed to render with the following messages:']
+        err += __pillar__['_errors']
+        return err
     opts = copy.copy(__opts__)
 
     if salt.utils.test_mode(test=test, **kwargs):
@@ -310,10 +336,15 @@ def top(topfn, test=None, **kwargs):
     if conflict:
         __context__['retcode'] = 1
         return conflict
+    if not _check_pillar(kwargs):
+        __context__['retcode'] = 5
+        err = ['Pillar failed to render with the following messages:']
+        err += __pillar__['_errors']
+        return err
     if salt.utils.test_mode(test=test, **kwargs):
-        opts['test'] = True
+        __opts__['test'] = True
     else:
-        opts['test'] = None
+        __opts__['test'] = None
     st_ = salt.state.HighState(__opts__)
     st_.push_active()
     st_.opts['state_top'] = os.path.join('salt://', topfn)
@@ -400,11 +431,11 @@ def show_top():
     ext = st_.client.ext_nodes()
     for top in [static, ext]:
         for env in top:
-            if not env in ret:
+            if env not in ret:
                 ret[env] = top[env]
             else:
                 for match in top[env]:
-                    if not match in ret[env]:
+                    if match not in ret[env]:
                         ret[env][match] = top[env][match]
                     else:
                         ret[env][match].extend(top[env][match])
