@@ -94,7 +94,7 @@ def _libvirt_creds():
 
 def _get_migrate_command():
     '''
-    Returns the command shared by the differnt migration types
+    Returns the command shared by the different migration types
     '''
     if __salt__['config.option']('virt.tunnel'):
         return ('virsh migrate --p2p --tunnelled --live --persistent '
@@ -106,12 +106,12 @@ def _get_target(target, ssh):
     proto = 'qemu'
     if ssh:
         proto += '+ssh'
-    return ' %s://%s/%s' %(proto, target, 'system')
+    return ' %s://%s/%s' % (proto, target, 'system')
 
 
 def _gen_xml(name, cpu, mem, vda, nicp, **kwargs):
     '''
-    Generate the xml string to define a libvirt vm
+    Generate the XML string to define a libvirt vm
     '''
     mem = mem * 1024
     data = '''
@@ -460,7 +460,7 @@ def get_disks(vm_):
                 qemu_target = source.getAttribute('dev')
             elif source.hasAttribute('protocol') and \
                     source.hasAttribute('name'): # For rbd network
-                qemu_target = '%s:%s' %(
+                qemu_target = '%s:%s' % (
                         source.getAttribute('protocol'),
                         source.getAttribute('name'))
             if qemu_target:
@@ -620,7 +620,7 @@ def full_info():
 
 def get_xml(vm_):
     '''
-    Returns the xml for a given vm
+    Returns the XML for a given vm
 
     CLI Example::
 
@@ -734,11 +734,11 @@ def ctrl_alt_del(vm_):
 
 def create_xml_str(xml):
     '''
-    Start a domain based on the xml passed to the function
+    Start a domain based on the XML passed to the function
 
     CLI Example::
 
-        salt '*' virt.create_xml_str <xml in string format>
+        salt '*' virt.create_xml_str <XML in string format>
     '''
     conn = __get_conn()
     return conn.createXML(xml, 0) is not None
@@ -750,7 +750,7 @@ def create_xml_path(path):
 
     CLI Example::
 
-        salt '*' virt.create_xml_path <path to xml file on the node>
+        salt '*' virt.create_xml_path <path to XML file on the node>
     '''
     if not os.path.isfile(path):
         return False
@@ -759,11 +759,11 @@ def create_xml_path(path):
 
 def define_xml_str(xml):
     '''
-    Define a domain based on the xml passed to the function
+    Define a domain based on the XML passed to the function
 
     CLI Example::
 
-        salt '*' virt.define_xml_str <xml in string format>
+        salt '*' virt.define_xml_str <XML in string format>
     '''
     conn = __get_conn()
     return conn.defineXML(xml) is not None
@@ -830,12 +830,12 @@ def seed_non_shared_migrate(disks, force=False):
         form = data['file format']
         size = data['virtual size'].split()[1][1:]
         if os.path.isfile(fn_) and not force:
-            # the target exists, check to see if is is compatible
+            # the target exists, check to see if it is compatible
             pre = yaml.safe_load(subprocess.Popen('qemu-img info arch',
                 shell=True,
                 stdout=subprocess.PIPE).communicate()[0])
-            if not pre['file format'] == data['file format']\
-                    and not pre['virtual size'] == data['virtual size']:
+            if pre['file format'] != data['file format']\
+                    and pre['virtual size'] != data['virtual size']:
                 return False
         if not os.path.isdir(os.path.dirname(fn_)):
             os.makedirs(os.path.dirname(fn_))
@@ -1070,7 +1070,7 @@ def vm_netstats(vm_=None):
                 'tx_errs'    : 0,
                 'tx_drop'    : 0
                }
-        for mac, attrs in nics.items():
+        for attrs in nics.values():
             if 'target' in attrs:
                 dev = attrs['target']
                 stats = dom.interfaceStats(dev)

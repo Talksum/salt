@@ -41,7 +41,7 @@ def _rm_mods(pre_mods, post_mods):
     return pre - post
 
 
-def _union_module(a,b):
+def _union_module(a, b):
     '''
     Return union of two list where duplicated items are only once
     '''
@@ -75,7 +75,7 @@ def _set_persistent_module(mod):
     '''
     conf = _get_modules_conf()
     mod_name = _strip_module_name(mod)
-    if not mod_name or mod_name in mod_list(True) or not mod_name in available():
+    if not mod_name or mod_name in mod_list(True) or mod_name not in available():
         return set()
     escape_mod = re.escape(mod)
     ## If module is commented only uncomment it
@@ -93,7 +93,7 @@ def _remove_persistent_module(mod, comment):
     '''
     conf = _get_modules_conf()
     mod_name = _strip_module_name(mod)
-    if not mod_name or not mod_name in mod_list(True):
+    if not mod_name or mod_name not in mod_list(True):
         return set()
     escape_mod = re.escape(mod)
     if comment:
@@ -169,12 +169,12 @@ def mod_list(only_persist=False):
     '''
     mods = set()
     if only_persist:
-        file = open(_get_modules_conf(), 'r')
-        for line in file.readlines():
-            line = line.strip()
-            mod_name = _strip_module_name(line)
-            if not line.startswith('#') and mod_name:
-                mods.add(mod_name)
+        with open(_get_modules_conf(), 'r') as modules_file:
+            for line in modules_file:
+                line = line.strip()
+                mod_name = _strip_module_name(line)
+                if not line.startswith('#') and mod_name:
+                    mods.add(mod_name)
     else:
         for mod in lsmod():
             mods.add(mod['module'])

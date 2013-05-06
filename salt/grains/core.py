@@ -55,7 +55,7 @@ if salt.utils.is_windows():
 
 def _windows_cpudata():
     '''
-    Return some cpu information on Windows minions
+    Return some CPU information on Windows minions
     '''
     # Provides:
     #   num_cpus
@@ -74,7 +74,7 @@ def _windows_cpudata():
 
 def _linux_cpudata():
     '''
-    Return some cpu information for Linux minions
+    Return some CPU information for Linux minions
     '''
     # Provides:
     #   num_cpus
@@ -173,7 +173,7 @@ def _linux_gpu_data():
 
 def _bsd_cpudata(osdata):
     '''
-    Return cpu information for BSD-like systems
+    Return CPU information for BSD-like systems
     '''
     # Provides:
     #   cpuarch
@@ -201,7 +201,7 @@ def _bsd_cpudata(osdata):
             cpu_here = False
             for line in _fp:
                 if line.startswith('CPU: '):
-                    cpu_here = True  # starts cpu descr
+                    cpu_here = True  # starts CPU descr
                     continue
                 if cpu_here:
                     if not line.startswith(' '):
@@ -222,7 +222,7 @@ def _bsd_cpudata(osdata):
 
 def _sunos_cpudata(osdata):
     '''
-    Return the cpu information for Solaris-like systems
+    Return the CPU information for Solaris-like systems
     '''
     # Provides:
     #   cpuarch
@@ -289,7 +289,7 @@ def _virtual(osdata):
     #   virtual
     #   virtual_subtype
     grains = {'virtual': 'physical'}
-    for command in ('dmidecode', 'lspci'):
+    for command in ('dmidecode', 'lspci', 'dmesg'):
         cmd = salt.utils.which(command)
 
         if not cmd:
@@ -310,13 +310,17 @@ def _virtual(osdata):
 
         output = ret['stdout']
 
-        if command == 'dmidecode':
+        if command == 'dmidecode' or command == 'dmesg':
             # Product Name: VirtualBox
             if 'Vendor: QEMU' in output:
                 # FIXME: Make this detect between kvm or qemu
                 grains['virtual'] = 'kvm'
             if 'Vendor: Bochs' in output:
                 grains['virtual'] = 'kvm'
+            # Product Name: (oVirt) www.ovirt.org
+            # Red Hat Community virtualization Project based on kvm 
+            elif 'Manufacturer: oVirt' in output:
+                grains['virtual'] = 'kvm'                
             elif 'VirtualBox' in output:
                 grains['virtual'] = 'VirtualBox'
             # Product Name: VMware Virtual Platform
@@ -324,7 +328,7 @@ def _virtual(osdata):
                 grains['virtual'] = 'VMware'
             # Manufacturer: Microsoft Corporation
             # Product Name: Virtual Machine
-            elif 'Manufacturer: Microsoft' in output and 'Virtual Machine' in output:
+            elif ': Microsoft' in output and 'Virtual Machine' in output:
                 grains['virtual'] = 'VirtualPC'
             # Manufacturer: Parallels Software International Inc.
             elif 'Parallels Software' in output:
@@ -348,10 +352,10 @@ def _virtual(osdata):
             break
     else:
         log.warn(
-            'Both \'dmidecode\' and \'lspci\' failed to execute, either '
+            'The tools \'dmidecode\', \'lspci\' and \'dmesg\' failed to execute '
             'because they do not exist on the system of the user running '
-            'this instance does not have the necessary permissions to '
-            'execute them. Grains output might not be accurate.'
+            'this instance or the user does not have the necessary permissions '
+            'to execute them. Grains output might not be accurate.'
         )
 
     choices = ('Linux', 'OpenBSD', 'HP-UX')
@@ -544,9 +548,11 @@ _OS_FAMILY_MAP = {
     'SUSE': 'Suse',
     'Solaris': 'Solaris',
     'SmartOS': 'Solaris',
+    'OpenIndiana Development': 'Solaris',
     'Arch ARM': 'Arch',
     'ALT': 'RedHat',
-    'Trisquel': 'Debian'
+    'Trisquel': 'Debian',
+    'GCEL': 'Debian'
 }
 
 
@@ -632,7 +638,7 @@ def os_data():
                         if comps[0] == 'ALT':
                             grains['lsb_distrib_release'] = comps[2]
                             grains['lsb_distrib_codename'] = \
-                                comps[3].replace('(','').replace(')','')
+                                comps[3].replace('(', '').replace(')', '')
         # Use the already intelligent platform module to get distro info
         (osname, osrelease, oscodename) = platform.linux_distribution(
             supported_dists=_supported_dists)
@@ -655,12 +661,29 @@ def os_data():
         grains.update(_linux_cpudata())
         grains.update(_linux_gpu_data())
     elif grains['kernel'] == 'SunOS':
-        grains['os'] = 'Solaris'
+        grains['os_family'] = 'Solaris'
         if os.path.isfile('/etc/release'):
             with salt.utils.fopen('/etc/release', 'r') as fp_:
                 rel_data = fp_.read()
                 if 'SmartOS' in rel_data:
                     grains['os'] = 'SmartOS'
+                    # FIXME: need detection of osrelease for SmartOS
+                    grains['osrelease'] = ''
+                else:
+                    try:
+                        release_re = '(Solaris|OpenIndiana(?: Development)?)' \
+                                     '\s+(\d+ \d+\/\d+|oi_\S+)?'
+                        osname, osrelease = re.search(release_re,
+                                                      rel_data).groups()
+                    except AttributeError:
+                        # Set a blank osrelease grain and fallback to 'Solaris'
+                        # as the 'os' grain.
+                        grains['os'] = 'Solaris'
+                        grains['osrelease'] = ''
+                    else:
+                        grains['os'] = osname
+                        grains['osrelease'] = osrelease
+
         grains.update(_sunos_cpudata(grains))
     elif grains['kernel'] == 'VMkernel':
         grains['os'] = 'ESXi'
@@ -912,3 +935,13 @@ def get_server_id():
     # Provides:
     #   server_id
     return {'server_id': abs(hash(__opts__.get('id', '')) % (2 ** 31))}
+
+def get_master():
+    '''
+    Provides the minion with the name of its master.
+    This is useful in states to target other services running on the master.
+    '''
+    # Provides:
+    #   master
+    return {'master': __opts__.get('master', '')}
+

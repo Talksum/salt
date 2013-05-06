@@ -198,7 +198,7 @@ def latest_version(*names, **kwargs):
     yumbase = yum.YumBase()
     error = _set_repo_options(yumbase, **kwargs)
     if error:
-        log.error(e)
+        log.error(error)
 
     # look for available packages only, if package is already installed with
     # latest version it will not show up here.  If we want to use wildcards
@@ -364,9 +364,9 @@ def group_install(name=None,
     pkgs = []
     for group in pkg_groups:
         group_detail = group_info(group)
-        for package in group_detail['mandatory packages'].keys():
+        for package in group_detail.get('mandatory packages', {}):
             pkgs.append(package)
-        for package in group_detail['default packages'].keys():
+        for package in group_detail.get('default packages', {}):
             if package not in skip_pkgs:
                 pkgs.append(package)
         for package in include:
@@ -378,7 +378,6 @@ def group_install(name=None,
 
 def install(name=None,
             refresh=False,
-            fromrepo=None,
             skip_verify=False,
             pkgs=None,
             sources=None,
@@ -473,12 +472,12 @@ def install(name=None,
             # Allow "version" to work for single package target
             pkg_params = {name: version}
         else:
-            log.warning('"version" parameter will be ignored for muliple '
+            log.warning('"version" parameter will be ignored for multiple '
                         'package targets')
 
     error = _set_repo_options(yumbase, **kwargs)
     if error:
-        log.error(e)
+        log.error(error)
         return {}
 
     try:
@@ -670,7 +669,7 @@ def group_info(groupname):
     yumbase = yum.YumBase()
     (installed, available) = yumbase.doGroupLists()
     for group in installed + available:
-        if group.name == groupname:
+        if group.name.lower() == groupname.lower():
             return {'mandatory packages': group.mandatory_packages,
                     'optional packages': group.optional_packages,
                     'default packages': group.default_packages,
@@ -779,12 +778,12 @@ def del_repo(repo, basedir='/etc/yum.repos.d', **kwargs):
     '''
     repos = list_repos(basedir)
 
-    if not repo in repos.keys():
+    if repo not in repos:
         return 'Error: the {0} repo does not exist in {1}'.format(repo, basedir)
 
     # Find out what file the repo lives in
     repofile = ''
-    for arepo in repos.keys():
+    for arepo in repos:
         if arepo == repo:
             repofile = repos[arepo]['file']
 
@@ -809,11 +808,11 @@ def del_repo(repo, basedir='/etc/yum.repos.d', **kwargs):
         if stanza == repo:
             continue
         comments = ''
-        if 'comments' in filerepos[stanza].keys():
+        if 'comments' in filerepos[stanza]:
             comments = '\n'.join(filerepos[stanza]['comments'])
             del filerepos[stanza]['comments']
         content += '\n[{0}]'.format(stanza)
-        for line in filerepos[stanza].keys():
+        for line in filerepos[stanza]:
             content += '\n{0}={1}'.format(line, filerepos[stanza][line])
         content += '\n{0}\n'.format(comments)
     fileout = open(repofile, 'w')
@@ -830,7 +829,7 @@ def mod_repo(repo, basedir=None, **kwargs):
 
         repo (name by which the yum refers to the repo)
         name (a human-readable name for the repo)
-        baseurl or mirrorlist (the url for yum to reference)
+        baseurl or mirrorlist (the URL for yum to reference)
 
     Key/Value pairs may also be removed from a repo's configuration by setting
     a key to a blank value. Bear in mind that a name cannot be deleted, and a
@@ -864,7 +863,7 @@ def mod_repo(repo, basedir=None, **kwargs):
     repofile = ''
     header = ''
     filerepos = {}
-    if not repo in repos.keys():
+    if repo not in repos:
         # If the repo doesn't exist, create it in a new file
         repofile = '{0}/{1}.repo'.format(basedir, repo)
 
@@ -937,7 +936,7 @@ def _parse_repo_file(filename):
             if not repo:
                 header += line
             else:
-                if not 'comments' in repos[repo].keys():
+                if 'comments' not in repos[repo]:
                     repos[repo]['comments'] = []
                 repos[repo]['comments'].append(line.strip())
             continue
@@ -1004,3 +1003,15 @@ def file_dict(*packages):
         salt '*' pkg.file_list
     '''
     return __salt__['lowpkg.file_dict'](*packages)
+
+
+def expand_repo_def(repokwargs):
+    '''
+    Take a repository definition and expand it to the full pkg repository dict
+    that can be used for comparison.  This is a helper function to make
+    certain repo managers sane for comparison in the pkgrepo states.
+
+    There is no use to calling this function via the CLI.
+    '''
+    # YUM doesn't need the data massaged.
+    return repokwargs

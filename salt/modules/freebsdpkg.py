@@ -4,6 +4,7 @@ Package support for FreeBSD
 
 # Import python libs
 import logging
+import os
 
 # Import salt libs
 import salt.utils
@@ -402,8 +403,8 @@ def file_list(*packages):
     '''
     ret = file_dict(*packages)
     files = []
-    for pkg, its_files in ret['files'].items():
-        files.extend(its_files)
+    for pkg_files in ret['files'].values():
+        files.extend(pkg_files)
     ret['files'] = files
     return ret
 

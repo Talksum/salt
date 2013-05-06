@@ -130,6 +130,30 @@ def list_upgrades(refresh=True):
     return {}
 
 
+def list_available(*names):
+    '''
+    Return a list of available versions of the specified package.
+
+    CLI Example::
+
+        salt '*' pkg.list_available <package name>
+        salt '*' pkg.list_available <package name01> <package name02>
+    '''
+    if not names:
+        return ''
+    if len(names) == 1:
+        pkginfo = _get_package_info(names[0])
+        if not pkginfo:
+            return ''
+        versions = pkginfo.keys()
+    if len(names) > 1:
+        versions = {}
+        for name in names:
+            pkginfo = _get_package_info(name)
+            versions[name] = pkginfo.keys() if pkginfo else []
+    return versions
+
+
 def version(*names, **kwargs):
     '''
     Returns a version if the package is installed, else returns an empty string
@@ -138,7 +162,38 @@ def version(*names, **kwargs):
 
         salt '*' pkg.version <package name>
     '''
-    return __salt__['pkg_resource.version'](*names, **kwargs)
+    win_names = []
+    ret = {}
+    if len(names) == 1:
+        versions = _get_package_info(names[0])
+        if versions:
+            for version, val in versions.iteritems():
+                if 'full_name' in val and len(val.get('full_name', '')) > 0:
+                    win_names.append(val.get('full_name', ''))
+        nums = __salt__['pkg_resource.version'](*win_names, **kwargs)
+        if len(nums):
+            for num, val in nums.iteritems():
+                if len(val) > 0:
+                    return val
+        return ''
+    if len(names) > 1:
+        reverse_dict = {}
+        for name in names:
+            ret[name] = ''
+            versions = _get_package_info(name)
+            if versions:
+                for version, val in versions.iteritems():
+                    if 'full_name' in val and len(val.get('full_name', '')) > 0:
+                        reverse_dict[val.get('full_name', '')] = name
+                        win_names.append(val.get('full_name', ''))
+        nums = __salt__['pkg_resource.version'](*win_names, **kwargs)
+        if len(nums):
+            for num, val in nums.iteritems():
+                if len(val) > 0:
+                    ret[reverse_dict[num]] = val
+            return ret
+        return ''
+    return ret
 
 
 def list_pkgs(*args, **kwargs):
@@ -255,8 +310,8 @@ def _get_reg_software():
                     reg_hive,
                     prd_uninst_key,
                     "DisplayVersion")
-                if not name in ignore_list:
-                    if not prd_name == 'Not Found':
+                if name not in ignore_list:
+                    if prd_name != 'Not Found':
                         reg_software[prd_name] = prd_ver
     return reg_software
 
@@ -343,9 +398,8 @@ def refresh_db():
         cached_repo = __salt__['cp.cache_file'](repocache)
         return True
     # Check if the master's cache file has changed
-    if __salt__['cp.hash_file'](repocache) !=\
-            __salt__['cp.hash_file'](cached_repo):
-                cached_repo = __salt__['cp.cache_file'](repocache)
+    if __salt__['cp.hash_file'](repocache) != __salt__['cp.hash_file'](cached_repo):
+        cached_repo = __salt__['cp.cache_file'](repocache)
     return True
 
 
@@ -383,8 +437,9 @@ def install(name=None, refresh=False, **kwargs):
         cached_pkg = pkginfo[version]['installer']
     cached_pkg = cached_pkg.replace('/', '\\')
     cmd = '"' + str(cached_pkg) + '"' + str(pkginfo[version]['install_flags'])
-    if pkginfo[version]['msiexec']:
-        cmd = 'msiexec /i ' + cmd
+    if 'msiexec' in pkginfo[version]:
+        if pkginfo[version]['msiexec']:
+            cmd = 'msiexec /i ' + cmd
     stderr = __salt__['cmd.run_all'](cmd).get('stderr', '')
     if stderr:
         log.error(stderr)
@@ -442,8 +497,9 @@ def remove(name, version=None, **kwargs):
         cached_pkg = cached_pkg.replace('(x86)', '')
     cmd = '"' + str(os.path.expandvars(
         cached_pkg)) + '"' + str(pkginfo[version]['uninstall_flags'])
-    if pkginfo[version]['msiexec']:
-        cmd = 'msiexec /x ' + cmd
+    if 'msiexec'in pkginfo[version]:
+        if pkginfo[version]['msiexec']:
+            cmd = 'msiexec /x ' + cmd
     stderr = __salt__['cmd.run_all'](cmd).get('stderr', '')
     if stderr:
         log.error(stderr)
