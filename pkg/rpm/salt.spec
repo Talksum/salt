@@ -64,21 +64,31 @@ malleable. Salt accomplishes this via its ability to handle larger loads of
 information, and not just dozens, but hundreds or even thousands of individual 
 servers, handle them quickly and through a simple and manageable interface.
 
-%package -n salt-master
+%package master
 Summary: Management component for salt, a parallel remote execution system 
 Group:   System Environment/Daemons
 Requires: salt = %{version}-%{release}
 
-%description -n salt-master 
+%description master 
 The Salt master is the central server to which all minions connect.
 
-%package -n salt-minion
+%package minion
 Summary: Client component for salt, a parallel remote execution system 
 Group:   System Environment/Daemons
 Requires: salt = %{version}-%{release}
 
-%description -n salt-minion
+%description minion
 Salt minion is queried and controlled from the master.
+
+%package -n talkos-salt
+Summary: Talksum-specific version of salt for TalkOS device control
+Group:   System Environment/Daemons
+Requires: salt-minion = %{version}-%{release}
+Requires: salt-master = %{version}-%{release}
+
+%description -n talkos-salt
+The TalkOS version of Salt provides customized master and minion configs that
+are specifically tailored to the environment on Talksum devices.
 
 %prep
 %setup -c
@@ -93,6 +103,8 @@ mkdir -p $RPM_BUILD_ROOT%{_initrddir}
 install -p %{SOURCE1} $RPM_BUILD_ROOT%{_initrddir}/
 install -p %{SOURCE2} $RPM_BUILD_ROOT%{_initrddir}/
 install -p %{SOURCE3} $RPM_BUILD_ROOT%{_initrddir}/
+install -p pkg/rpm/talkos/talkos-salt-master $RPM_BUILD_ROOT%{_initrddir}/
+install -p pkg/rpm/talkos/talkos-salt-minion $RPM_BUILD_ROOT%{_initrddir}/
 
 #install -p %{SOURCE7} .
 
@@ -102,6 +114,12 @@ install -p -m 0640 conf/master $RPM_BUILD_ROOT%{_sysconfdir}/salt/master
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/default/
 install -p -m 0644 %{SOURCE8} $RPM_BUILD_ROOT%{_sysconfdir}/default/salt
+
+# wrapper scripts for talkos-salt
+for script in pkg/rpm/talkos/talkos-salt*.sh; do
+    scriptexe=`basename $script`
+    install -p -m 0755 $script $RPM_BUILD_ROOT%{_bindir}/${scriptexe%.*}
+done
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -115,7 +133,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man7/salt.7
 #%doc README.fedora
 
-%files -n salt-minion
+%files minion
 %defattr(-,root,root)
 %doc %{_mandir}/man1/salt-call.1
 %doc %{_mandir}/man1/salt-minion.1
@@ -124,7 +142,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0755, root, root) %{_initrddir}/salt-minion
 %config(noreplace) %{_sysconfdir}/salt/minion
 
-%files -n salt-master
+%files master
 %defattr(-,root,root)
 %doc %{_mandir}/man1/salt-master.1
 %doc %{_mandir}/man1/salt.1
@@ -142,7 +160,13 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0755, root, root) %{_initrddir}/salt-syndic
 %config(noreplace) %{_sysconfdir}/salt/master
 
-%preun -n salt-master
+%files -n talkos-salt
+%defattr(0755,root,root)
+%{_initrddir}/talkos-salt-master
+%{_initrddir}/talkos-salt-minion
+%{_bindir}/talkos-salt*
+
+%preun master
   if [ $1 -eq 0 ] ; then
       /sbin/service salt-master stop >/dev/null 2>&1
       /sbin/service salt-syndic stop >/dev/null 2>&1
@@ -150,26 +174,26 @@ rm -rf $RPM_BUILD_ROOT
       /sbin/chkconfig --del salt-syndic
   fi
 
-%preun -n salt-minion
+%preun minion
   if [ $1 -eq 0 ] ; then
       /sbin/service salt-minion stop >/dev/null 2>&1
       /sbin/chkconfig --del salt-minion
   fi
 
-%post -n salt-master
+%post master
   /sbin/chkconfig --add salt-master
   /sbin/chkconfig --add salt-syndic
 
-%post -n salt-minion
+%post minion
   /sbin/chkconfig --add salt-minion
 
-%postun -n salt-master
+%postun master
   if [ "$1" -ge "1" ] ; then
       /sbin/service salt-master condrestart >/dev/null 2>&1 || :
       /sbin/service salt-syndic condrestart >/dev/null 2>&1 || :
   fi
 
-%postun -n salt-minion
+%postun minion
   if [ "$1" -ge "1" ] ; then
       /sbin/service salt-master condrestart >/dev/null 2>&1 || :
       /sbin/service salt-syndic condrestart >/dev/null 2>&1 || :
@@ -178,7 +202,7 @@ rm -rf $RPM_BUILD_ROOT
 %changelog
 * Mon May 06 2013 Mike Chesnut <mikec@talksum.com> - 0.15.0-1
 - move to latest git head to get features from 0.15.0 release
-- add new tsalt daemons as part of TALK-424
+- add new talkos-salt scripts as part of TALK-424
 
 * Fri Apr 19 2013 Clint Savage <herlo1@gmail.com> - 0.14.1-1
 - Update to upstream patch release 0.14.1
