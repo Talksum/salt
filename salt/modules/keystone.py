@@ -456,7 +456,7 @@ def user_password_update(id=None,         # pylint: disable-msg=C0103
 
         salt '*' keystone.user_delete c965f79c4f864eaaa9c3b41904e67082 password=12345
         salt '*' keystone.user_delete id=c965f79c4f864eaaa9c3b41904e67082 password=12345
-        salt '*' keystone.user_delete name=nova pasword=12345
+        salt '*' keystone.user_delete name=nova password=12345
     '''
     kstone = auth()
     if name:
@@ -535,9 +535,9 @@ def _item_list():
     #keystone module. This list should be updated as functions are added.
     #
     #ec2-credentials-create
-    #                    Create EC2-compatibile credentials for user per tenant
+    #                    Create EC2-compatible credentials for user per tenant
     #ec2-credentials-delete
-    #                    Delete EC2-compatibile credentials
+    #                    Delete EC2-compatible credentials
     #endpoint-create     Create a new endpoint associated with a service
     #endpoint-delete     Delete a service endpoint
     #role-create         Create new role

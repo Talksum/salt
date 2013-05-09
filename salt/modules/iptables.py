@@ -5,6 +5,7 @@ Support for iptables
 # Import python libs
 import os
 import sys
+import shlex
 
 # Import salt libs
 import salt.utils
@@ -263,10 +264,10 @@ def _parse_conf(conf_file=None, in_mem=False):
             parser = _parser()
             parsed_args = []
             if sys.version.startswith('2.6'):
-                (opts, args) = parser.parse_args(line.split())
+                (opts, args) = parser.parse_args(shlex.split(line))
                 parsed_args = vars(opts)
             else:
-                parsed_args = vars(parser.parse_args(line.split()))
+                parsed_args = vars(parser.parse_args(shlex.split(line)))
             ret_args = {}
             chain = parsed_args['append']
             for arg in parsed_args:
@@ -274,7 +275,7 @@ def _parse_conf(conf_file=None, in_mem=False):
                     ret_args[arg] = parsed_args[arg]
             if parsed_args['comment'] is not None:
                 comment = parsed_args['comment'][0].strip('"')
-                ret[table][chain[0]]['rules_comment'][comment]=ret_args
+                ret[table][chain[0]]['rules_comment'][comment] = ret_args
             ret[table][chain[0]]['rules'].append(ret_args)
     return ret
 

@@ -3,7 +3,7 @@
     salt.utils.parsers
     ~~~~~~~~~~~~~~~~~~
 
-    This is were all the black magic happens on all of salt's cli tools.
+    This is were all the black magic happens on all of salt's CLI tools.
 
     :codeauthor: :email:`Pedro Algarvio (pedro@algarvio.me)`
     :copyright: © 2012 by the SaltStack Team, see AUTHORS for more details.
@@ -129,10 +129,12 @@ class OptionParser(optparse.OptionParser):
         for process_option_func in _sorted(process_option_funcs):
             try:
                 process_option_func()
-            except Exception, err:
-                self.error('Error while processing {0}: {1}'.format(
-                    process_option_func, traceback.format_exc(err)
-                ))
+            except Exception as err:
+                self.error(
+                    'Error while processing {0}: {1}'.format(
+                        process_option_func, traceback.format_exc(err)
+                    )
+                )
 
         # Run the functions on self._mixin_after_parsed_funcs
         for mixin_after_parsed_func in self._mixin_after_parsed_funcs:
@@ -168,7 +170,7 @@ class OptionParser(optparse.OptionParser):
 
 class MergeConfigMixIn(object):
     '''
-    This mix-in will simply merge the cli passed options, by overriding the
+    This mix-in will simply merge the CLI-passed options, by overriding the
     configuration file loaded settings.
 
     This mix-in should run last.
@@ -715,6 +717,8 @@ class SyndicOptionParser(OptionParser, ConfigDirMixIn, MergeConfigMixIn,
         opts.update(config.minion_config(self.get_config_file_path('minion')))
         # Override the user from the master config file
         opts['user'] = user
+        # Override the name of the PID file.
+        opts['pidfile'] = '/var/run/salt-syndic.pid'
 
         if 'syndic_master' not in opts:
             self.error(
@@ -726,7 +730,7 @@ class SyndicOptionParser(OptionParser, ConfigDirMixIn, MergeConfigMixIn,
         # Some of the opts need to be changed to match the needed opts
         # in the minion class.
         opts['master'] = opts['syndic_master']
-        opts['master_ip'] = utils.dns_check(opts['master'])
+        opts['master_ip'] = utils.dns_check(opts['master'], ipv6=opts['ipv6'])
 
         opts['master_uri'] = 'tcp://{0}:{1}'.format(
             opts['master_ip'], str(opts['master_port'])

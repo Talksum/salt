@@ -78,6 +78,9 @@ def _replace_auth_key(
 
     lines = []
     uinfo = __salt__['user.info'](user)
+    if not uinfo:
+        msg = 'User {0} does not exist'.format(user)
+        raise CommandExecutionError(msg)
     full = os.path.join(uinfo['home'], config)
     try:
         # open the file for both reading AND writing
@@ -219,8 +222,8 @@ def auth_keys(user, config='.ssh/authorized_keys'):
         salt '*' ssh.auth_keys root
     '''
     uinfo = __salt__['user.info'](user)
-    full = os.path.join(uinfo['home'], config)
-    if not os.path.isfile(full):
+    full = os.path.join(uinfo.get('home', ''), config)
+    if not uinfo or not os.path.isfile(full):
         return {}
 
     return _validate_keys(full)
@@ -286,7 +289,9 @@ def rm_auth_key(user, key, config='.ssh/authorized_keys'):
     if key in current:
         # Remove the key
         uinfo = __salt__['user.info'](user)
-        full = os.path.join(uinfo['home'], config)
+        if not uinfo:
+            return 'User {0} does not exist'.format(user)
+        full = os.path.join(uinfo.get('home', ''), config)
 
         # Return something sensible if the file doesn't exist
         if not os.path.isfile(full):
@@ -403,6 +408,8 @@ def set_auth_key(
 
     enc = _refine_enc(enc)
     uinfo = __salt__['user.info'](user)
+    if not uinfo:
+        return 'fail'
     status = check_key(user, key, enc, comment, options, config)
     if status == 'update':
         _replace_auth_key(user, key, enc, comment, options or [], config)
@@ -411,7 +418,7 @@ def set_auth_key(
         return 'no change'
     else:
         auth_line = _format_auth_line(key, enc, comment, options)
-        if not os.path.isdir(uinfo['home']):
+        if not os.path.isdir(uinfo.get('home', '')):
             return 'fail'
         fconfig = os.path.join(uinfo['home'], config)
         if not os.path.isdir(os.path.dirname(fconfig)):
@@ -469,8 +476,8 @@ def get_known_host(user, hostname, config='.ssh/known_hosts'):
         salt '*' ssh.get_known_host <user> <hostname>
     '''
     uinfo = __salt__['user.info'](user)
-    full = os.path.join(uinfo['home'], config)
-    if not os.path.isfile(full):
+    full = os.path.join(uinfo.get('home', ''), config)
+    if not uinfo or not os.path.isfile(full):
         return None
     cmd = 'ssh-keygen -F "{0}" -f "{1}"'.format(hostname, full)
     lines = __salt__['cmd.run'](cmd).splitlines()
@@ -478,13 +485,13 @@ def get_known_host(user, hostname, config='.ssh/known_hosts'):
     return known_hosts[0] if known_hosts else None
 
 
-def recv_known_host(user, hostname, enc=None, port=None, hash_hostname=False):
+def recv_known_host(hostname, enc=None, port=None, hash_hostname=False):
     '''
     Retrieve information about host public key from remote server
 
     CLI Example::
 
-        salt '*' ssh.recv_known_host <user> <hostname> enc=<enc> port=<port>
+        salt '*' ssh.recv_known_host <hostname> enc=<enc> port=<port>
     '''
     chunks = ['ssh-keyscan', ]
     if port:
@@ -524,7 +531,8 @@ def check_known_host(user, hostname, key=None, fingerprint=None,
     if key:
         return 'exists' if key == known_host['key'] else 'update'
     elif fingerprint:
-        return 'exists' if fingerprint == known_host['fingerprint'] else 'update'
+        return ('exists' if fingerprint == known_host['fingerprint']
+                else 'update')
     else:
         return 'exists'
 
@@ -538,12 +546,18 @@ def rm_known_host(user, hostname, config='.ssh/known_hosts'):
         salt '*' ssh.rm_known_host <user> <hostname>
     '''
     uinfo = __salt__['user.info'](user)
-    full = os.path.join(uinfo['home'], config)
+    if not uinfo:
+        return {'status': 'error',
+                'error': 'User {0} does not exist'.format(user)}
+    full = os.path.join(uinfo.get('home', ''), config)
     if not os.path.isfile(full):
         return {'status': 'error',
                 'error': 'Known hosts file {0} does not exist'.format(full)}
     cmd = 'ssh-keygen -R "{0}" -f "{1}"'.format(hostname, full)
     cmd_result = __salt__['cmd.run'](cmd)
+    # ssh-keygen creates a new file, thus a chown is required.
+    if os.geteuid() == 0:
+        os.chown(full, uinfo['uid'], uinfo['gid'])
     return {'status': 'removed', 'comment': cmd_result}
 
 
@@ -563,8 +577,8 @@ def set_known_host(user, hostname,
 
     CLI Example::
 
-        salt '*' ssh.set_known_host <user> fingerprint='xx:xx:..:xx' enc='ssh-rsa'\
-                 config='.ssh/known_hosts'
+        salt '*' ssh.set_known_host <user> fingerprint='xx:xx:..:xx' \
+                 enc='ssh-rsa' config='.ssh/known_hosts'
     '''
     update_required = False
     stored_host = get_known_host(user, hostname, config)
@@ -577,7 +591,9 @@ def set_known_host(user, hostname,
     if not update_required:
         return {'status': 'exists', 'key': stored_host}
 
-    remote_host = recv_known_host(user, hostname, enc=enc, port=port,
+    remote_host = recv_known_host(hostname,
+                                  enc=enc,
+                                  port=port,
                                   hash_hostname=hash_hostname)
     if not remote_host:
         return {'status': 'error',
@@ -592,6 +608,9 @@ def set_known_host(user, hostname,
     rm_known_host(user, hostname, config=config)
     # set up new value
     uinfo = __salt__['user.info'](user)
+    if not uinfo:
+        return {'status': 'error',
+                'error': 'User {0} does not exist'.format(user)}
     full = os.path.join(uinfo['home'], config)
     line = '{hostname} {enc} {key}\n'.format(**remote_host)
 

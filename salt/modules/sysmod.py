@@ -23,16 +23,16 @@ def __virtual__():
 def doc(module=''):
     '''
     Return the docstrings for all modules. Optionally, specify a module or a
-    function to narrow te selection.
+    function to narrow the selection.
 
     The strings are aggregated into a single document on the master for easy
     reading.
 
     CLI Example::
 
-        salt \* sys.doc
-        salt \* sys.doc sys
-        salt \* sys.doc sys.doc
+        salt '*' sys.doc
+        salt '*' sys.doc sys
+        salt '*' sys.doc sys.doc
     '''
     docs = {}
     if module:
@@ -54,8 +54,8 @@ def list_functions(module=''):
 
     CLI Example::
 
-        salt \* sys.list_functions
-        salt \* sys.list_functions sys
+        salt '*' sys.list_functions
+        salt '*' sys.list_functions sys
     '''
     names = set()
     if module:
@@ -74,7 +74,7 @@ def list_modules():
 
     CLI Example::
 
-        salt \* sys.list_modules
+        salt '*' sys.list_modules
     '''
     modules = set()
     for func in __salt__:
@@ -91,7 +91,7 @@ def reload_modules():
 
     CLI Example::
 
-        salt \* sys.reload_modules
+        salt '*' sys.reload_modules
     '''
     # This is handled inside the minion.py file, the function is caught before
     # it ever gets here

@@ -129,6 +129,10 @@ class SREQ(object):
             self.socket.setsockopt(
                 zmq.RECONNECT_IVL_MAX, 5000
             )
+
+        if master.startswith('tcp://[') and hasattr(zmq, 'IPV4ONLY'):
+            # IPv6 sockets work for both IPv6 and IPv4 addresses
+            self.socket.setsockopt(zmq.IPV4ONLY, 0)
         self.socket.linger = linger
         if id_:
             self.socket.setsockopt(zmq.IDENTITY, id_)
@@ -158,13 +162,13 @@ class SREQ(object):
                 )
         return self.serial.loads(self.socket.recv())
 
-    def send_auto(self, payload):
+    def send_auto(self, payload, tries=1, timeout=60):
         '''
         Detect the encryption type based on the payload
         '''
         enc = payload.get('enc', 'clear')
         load = payload.get('load', {})
-        return self.send(enc, load)
+        return self.send(enc, load, tries, timeout)
 
     def destroy(self):
         for socket in self.poller.sockets.keys():

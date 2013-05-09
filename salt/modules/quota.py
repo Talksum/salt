@@ -1,5 +1,5 @@
 '''
-Module for managing quotas on posix-like systems.
+Module for managing quotas on POSIX-like systems.
 '''
 
 # Import python libs
@@ -10,9 +10,9 @@ log = logging.getLogger(__name__)
 
 def __virtual__():
     '''
-    Only work on posix-like systems
+    Only work on POSIX-like systems
     '''
-    # Disable on these platorms, specific service modules exist:
+    # Disable on these platforms, specific service modules exist:
     disable = [
         'Windows',
         ]
@@ -42,7 +42,6 @@ def _parse_quota(mount, opts):
     cmd = 'repquota -vp {0} {1}'.format(opts, mount)
     out = __salt__['cmd.run'](cmd).splitlines()
     mode = 'header'
-    device = ''
 
     if '-u' in opts:
         quotatype = 'Users'
@@ -56,7 +55,7 @@ def _parse_quota(mount, opts):
         comps = line.split()
         if mode == 'header':
             if 'Report for' in line:
-                device = comps[-1:][0]
+                pass
             elif 'Block grace time' in line:
                 blockg, inodeg = line.split(';')
                 blockgc = blockg.split(': ')
@@ -109,7 +108,7 @@ def set(device, **kwargs):
             return {'Error': 'Please specify a user or group, not both.'}
         cmd += ' -g {0} '.format(kwargs['group'])
         parsed = _parse_quota(device, '-g')
-        if kwargs['user'] in parsed:
+        if kwargs['group'] in parsed:
             current = parsed['Groups'][kwargs['group']]
         else:
             current = empty
@@ -174,6 +173,7 @@ def on(device):
     '''
     cmd = 'quotaon {0}'.format(device)
     __salt__['cmd.run'](cmd)
+    return True
 
 
 def off(device):
@@ -186,5 +186,26 @@ def off(device):
     '''
     cmd = 'quotaoff {0}'.format(device)
     __salt__['cmd.run'](cmd)
+    return True
 
+
+def get_mode(device):
+    '''
+    Report whether the quota system for this device is on or off
+
+    CLI Example::
+
+        salt '*' quota.get_mode
+    '''
+    ret = {}
+    cmd = 'quotaon -p {0}'.format(device)
+    out = __salt__['cmd.run'](cmd)
+    for line in out.splitlines():
+        comps = line.strip().split()
+        if comps[3] not in ret:
+            ret[comps[3]] = {
+                'device': comps[4].replace('(', '').replace(')', ''),
+            }
+        ret[comps[3]][comps[0]] = comps[6]
+    return ret
 

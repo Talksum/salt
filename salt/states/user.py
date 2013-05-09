@@ -25,6 +25,7 @@ as either absent or present
 
 # Import python libs
 import logging
+import sys
 
 log = logging.getLogger(__name__)
 
@@ -34,11 +35,11 @@ def _changes(name,
              gid=None,
              groups=None,
              optional_groups=None,
+             remove_groups=True,
              home=True,
              password=None,
              enforce_password=True,
              shell=None,
-             unique=True,
              fullname='',
              roomnumber='',
              workphone='',
@@ -48,17 +49,15 @@ def _changes(name,
     otherwise return False.
     '''
 
-    if not __grains__['os'] in ('FreeBSD', 'OpenBSD'):
+    if __grains__['os'] not in ('FreeBSD', 'OpenBSD'):
         lshad = __salt__['shadow.info'](name)
 
-    lusr = __salt__['user.getent'](name)
+    lusr = __salt__['user.info'](name)
     if not lusr:
         return False
 
     change = {}
-    wanted_groups = sorted(
-        list(set((groups or []) + (optional_groups or [])))
-    )
+    wanted_groups = sorted(set((groups or []) + (optional_groups or [])))
     if uid:
         if lusr['uid'] != uid:
             change['uid'] = uid
@@ -66,29 +65,36 @@ def _changes(name,
         if lusr['gid'] not in (gid, __salt__['file.group_to_gid'](gid)):
             change['gid'] = gid
     # remove the default group from the list for comparison purposes
-    if __salt__['file.gid_to_group'](gid or lusr['gid']) in \
+    if gid and __salt__['file.gid_to_group'](gid or lusr['gid']) in \
             lusr['groups']:
         lusr['groups'].remove(
             __salt__['file.gid_to_group'](gid or lusr['gid'])
         )
     # remove default group from wanted_groups, as this requirement is
     # already met
-    if __salt__['file.gid_to_group'](gid or lusr['gid']) in \
+    if gid and __salt__['file.gid_to_group'](gid or lusr['gid']) in \
             wanted_groups:
         wanted_groups.remove(
             __salt__['file.gid_to_group'](gid or lusr['gid']))
     if groups is not None or wanted_groups:
-        if lusr['groups'] != wanted_groups:
-            change['groups'] = wanted_groups
+        if remove_groups:
+            if lusr['groups'] != wanted_groups:
+                change['groups'] = wanted_groups
+        else:
+            for wanted_group in wanted_groups:
+                if wanted_group not in lusr['groups']:
+                    if 'groups' not in change:
+                        change['groups'] = []
+                    change['groups'].append(wanted_group)
     if home:
         if lusr['home'] != home:
-            if not home is True:
+            if home is not True:
                 change['home'] = home
     if shell:
         if lusr['shell'] != shell:
             change['shell'] = shell
     if password:
-        if not __grains__['os'] in ('FreeBSD', 'OpenBSD'):
+        if __grains__['os'] not in ('FreeBSD', 'OpenBSD'):
             if lshad['pwd'] == '!' or \
                     lshad['pwd'] != '!' and enforce_password:
                 if lshad['pwd'] != password:
@@ -112,6 +118,7 @@ def present(name,
             gid_from_name=False,
             groups=None,
             optional_groups=None,
+            remove_groups=True,
             home=True,
             password=None,
             enforce_password=True,
@@ -152,6 +159,10 @@ def present(name,
 
     NOTE: If the same group is specified in both "groups" and
     "optional_groups", then it will be assumed to be required and not optional.
+
+    remove_groups
+        Remove groups that the user is a member of that weren't specified in
+        the state, True by default
 
     home
         The location of the home directory to manage
@@ -231,11 +242,11 @@ def present(name,
                        gid,
                        groups,
                        present_optgroups,
+                       remove_groups,
                        home,
                        password,
                        enforce_password,
                        shell,
-                       unique,
                        fullname,
                        roomnumber,
                        workphone,
@@ -257,18 +268,26 @@ def present(name,
             if key == 'passwd':
                 __salt__['shadow.set_password'](name, password)
                 continue
-            __salt__['user.ch{0}'.format(key)](name, val)
+            if key == 'groups':
+                __salt__['user.ch{0}'.format(key)](name, val, not remove_groups)
+            else:
+                __salt__['user.ch{0}'.format(key)](name, val)
+
+        # Clear cached groups
+        sys.modules[
+            __salt__['user.info'].__module__
+        ].__context__.pop('user.getgrall', None)
 
         post = __salt__['user.info'](name)
         spost = {}
-        if not __grains__['os'] in ('FreeBSD', 'OpenBSD'):
+        if __grains__['os'] not in ('FreeBSD', 'OpenBSD'):
             if lshad['pwd'] != password:
                 spost = __salt__['shadow.info'](name)
         # See if anything changed
         for key in post:
             if post[key] != pre[key]:
                 ret['changes'][key] = post[key]
-        if not __grains__['os'] in ('FreeBSD', 'OpenBSD'):
+        if __grains__['os'] not in ('FreeBSD', 'OpenBSD'):
             for key in spost:
                 if lshad[key] != spost[key]:
                     ret['changes'][key] = spost[key]
@@ -279,11 +298,11 @@ def present(name,
                            gid,
                            groups,
                            present_optgroups,
+                           remove_groups,
                            home,
                            password,
                            enforce_password,
                            shell,
-                           unique,
                            fullname,
                            roomnumber,
                            workphone,
@@ -343,7 +362,7 @@ def absent(name, purge=False, force=False):
         The name of the user to remove
 
     purge
-        Set purge to delete all of the user's file as well as the user
+        Set purge to delete all of the user's files as well as the user
 
     force
         If the user is logged in the absent state will fail, set the force
@@ -354,7 +373,7 @@ def absent(name, purge=False, force=False):
            'result': True,
            'comment': ''}
 
-    lusr = __salt__['user.getent'](name)
+    lusr = __salt__['user.info'](name)
     if lusr:
         # The user is present, make it not present
         if __opts__['test']:

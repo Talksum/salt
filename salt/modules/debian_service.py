@@ -8,7 +8,6 @@ import glob
 import re
 
 # Import salt libs
-import salt.utils
 from .systemd import _sd_booted
 
 
@@ -40,7 +39,7 @@ def get_enabled():
     ret = set()
     lines = glob.glob('{0}*'.format(prefix))
     for line in lines:
-        ret.add(re.split(prefix + '\d+', line)[1])
+        ret.add(re.split(prefix + r'\d+', line)[1])
     return sorted(ret)
 
 
@@ -177,7 +176,7 @@ def disable(name, **kwargs):
 
 def enabled(name):
     '''
-    Return True if the named servioce is enabled, false otherwise
+    Return True if the named service is enabled, false otherwise
 
     CLI Example::
 
@@ -188,7 +187,7 @@ def enabled(name):
 
 def disabled(name):
     '''
-    Return True if the named servioce is enabled, false otherwise
+    Return True if the named service is enabled, false otherwise
 
     CLI Example::
 

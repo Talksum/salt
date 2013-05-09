@@ -28,7 +28,9 @@ Full list of builtin state modules
     layman
     libvirt
     locale
+    lvm
     makeconf
+    mdadm
     module
     mongodb_database
     mongodb_user
@@ -46,6 +48,7 @@ Full list of builtin state modules
     postgres_database
     postgres_group
     postgres_user
+    quota
     rabbitmq_user
     rabbitmq_vhost
     rvm

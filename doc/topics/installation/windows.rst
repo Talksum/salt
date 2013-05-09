@@ -18,6 +18,18 @@ A Salt Minion Windows installer can be found here:
 
 .. admonition:: Download here
 
+    * 0.15.1
+    * http://saltstack.com/downloads/Salt-Minion-0.15.1-win32-Setup.exe
+    * http://saltstack.com/downloads/Salt-Minion-0.15.1-AMD64-Setup.exe
+
+    * 0.15.0
+    * http://saltstack.com/downloads/Salt-Minion-0.15.0-win32-Setup.exe
+    * http://saltstack.com/downloads/Salt-Minion-0.15.0-AMD64-Setup.exe
+
+    * 0.14.1
+    * http://saltstack.com/downloads/Salt-Minion-0.14.1-win32-Setup.exe
+    * http://saltstack.com/downloads/Salt-Minion-0.14.1-AMD64-Setup.exe
+
     * 0.14.0
     * http://saltstack.com/downloads/Salt-Minion-0.14.0-win32-Setup.exe
     * http://saltstack.com/downloads/Salt-Minion-0.14.0-AMD64-Setup.exe
@@ -156,7 +168,7 @@ Install on Windows XP 32bit
         cd ./salt
         python setup.py install
 
-18.  Edit c:\\etc\\salt\\minon
+18.  Edit c:\\etc\\salt\\minion
 
 .. code-block:: bash
 

@@ -89,7 +89,7 @@ def valid_fileproto(uri):
     '''
     try:
         return bool(re.match('^(?:salt|https?|ftp)://', uri))
-    except:
+    except Exception:
         return False
 
 
@@ -124,7 +124,7 @@ def get(key, default=''):
     '''
     .. versionadded: 0.14
 
-    Attempt to retrive the named value from opts, pillar, grains of the master
+    Attempt to retrieve the named value from opts, pillar, grains of the master
     config, if the named value is not available return the passed default.
     The default return is an empty string.
 
@@ -133,7 +133,7 @@ def get(key, default=''):
 
     {'pkg': {'apache': 'httpd'}}
 
-    To retrive the value associated with the apache key in the pkg dict this
+    To retrieve the value associated with the apache key in the pkg dict this
     key can be passed:
 
     pkg:apache
@@ -150,16 +150,16 @@ def get(key, default=''):
         salt '*' pillar.get pkg:apache
     '''
     ret = salt.utils.traverse_dict(__opts__, key, '_|-')
-    if not ret == '_|-':
+    if ret != '_|-':
         return ret
     ret = salt.utils.traverse_dict(__grains__, key, '_|-')
-    if not ret == '_|-':
+    if ret != '_|-':
         return ret
     ret = salt.utils.traverse_dict(__pillar__, key, '_|-')
-    if not ret == '_|-':
+    if ret != '_|-':
         return ret
     ret = salt.utils.traverse_dict(__pillar__.get('master', {}), key, '_|-')
-    if not ret == '_|-':
+    if ret != '_|-':
         return ret
     return default
 

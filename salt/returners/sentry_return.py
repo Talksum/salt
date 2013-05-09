@@ -38,7 +38,7 @@ def returner(ret):
     '''
     If an error occurs, log it to sentry
     '''
-    def connect_sentry(message, result):
+    def connect_sentry(result):
         pillar_data = __salt__['pillar.raw']()
         sentry_data = {
             'result': result,
@@ -56,13 +56,13 @@ def returner(ret):
                 secret_key=pillar_data['raven']['secret_key'],
                 project=pillar_data['raven']['project'],
             )
-        except KeyError, missing_key:
+        except KeyError as missing_key:
             logger.error("Sentry returner need config '%s' in pillar",
                          missing_key)
         else:
             try:
                 client.captureMessage(ret['comment'], extra=sentry_data)
-            except Exception, err:
+            except Exception as err:
                 logger.error("Can't send message to sentry: %s", err,
                              exc_info=True)
 
@@ -80,5 +80,5 @@ def returner(ret):
                     if not ret['return'][state]['result'] and \
                        ret['return'][state]['comment'] != requisite_error:
                         connect_sentry(state, ret['return'][state])
-    except Exception, err:
+    except Exception as err:
         logger.error("Can't run connect_sentry: %s", err, exc_info=True)

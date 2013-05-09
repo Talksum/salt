@@ -21,7 +21,7 @@ def _render_tab(lst):
     for pre in lst['pre']:
         ret.append('{0}\n'.format(pre))
     if len(ret):
-        if not ret[-1] == TAG:
+        if ret[-1] != TAG:
             ret.append(TAG)
     else:
         ret.append(TAG)
@@ -189,7 +189,7 @@ def set_job(user, minute, hour, dom, month, dow, cmd):
 
     CLI Example::
 
-        salt '*' cron.set_job root \* \* \* \* 1 /usr/local/weekly
+        salt '*' cron.set_job root '*' '*' '*' '*' 1 /usr/local/weekly
     '''
     # Scrub the types
     minute = str(minute)
@@ -200,11 +200,11 @@ def set_job(user, minute, hour, dom, month, dow, cmd):
     lst = list_tab(user)
     for cron in lst['crons']:
         if cmd == cron['cmd']:
-            if not minute == cron['min'] or \
-                    not hour == cron['hour'] or \
-                    not dom == cron['daymonth'] or \
-                    not month == cron['month'] or \
-                    not dow == cron['dayweek']:
+            if minute != cron['min'] or \
+                    hour != cron['hour'] or \
+                    dom != cron['daymonth'] or \
+                    month != cron['month'] or \
+                    dow != cron['dayweek']:
                 rm_job(user, minute, hour, dom, month, dow, cmd)
                 jret = set_job(user, minute, hour, dom, month, dow, cmd)
                 if jret == 'new':
@@ -232,7 +232,7 @@ def rm_job(user, minute, hour, dom, month, dow, cmd):
 
     CLI Example::
 
-        salt '*' cron.rm_job root \* \* \* \* 1 /usr/local/weekly
+        salt '*' cron.rm_job root '*' '*' '*' '*' 1 /usr/local/weekly
     '''
     lst = list_tab(user)
     ret = 'absent'
@@ -263,7 +263,7 @@ def set_env(user, name, value=None):
     lst = list_tab(user)
     for env in lst['env']:
         if name == env['name']:
-            if not value == env['value']:
+            if value != env['value']:
                 rm_env(user, name)
                 jret = set_env(user, name, value)
                 if jret == 'new':

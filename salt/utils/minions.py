@@ -21,7 +21,7 @@ def nodegroup_comp(group, nodegroups, skip=None):
     '''
     if skip is None:
         skip = set([group])
-    if not group in nodegroups:
+    if group not in nodegroups:
         return ''
     gstr = nodegroups[group]
     ret = ''
@@ -70,15 +70,12 @@ class CkMinions(object):
         '''
         Return the minions found by looking via regular expressions
         '''
-        ret = set()
         cwd = os.getcwd()
         os.chdir(os.path.join(self.opts['pki_dir'], 'minions'))
         reg = re.compile(expr)
-        for fn_ in os.listdir('.'):
-            if reg.match(fn_):
-                ret.add(fn_)
+        ret = [fn_ for fn_ in os.listdir('.') if reg.match(fn_)]
         os.chdir(cwd)
-        return list(ret)
+        return ret
 
     def _check_grain_minions(self, expr):
         '''
@@ -92,7 +89,7 @@ class CkMinions(object):
             if not os.path.isdir(cdir):
                 return list(minions)
             for id_ in os.listdir(cdir):
-                if not id_ in minions:
+                if id_ not in minions:
                     continue
                 datap = os.path.join(cdir, id_, 'data.p')
                 if not os.path.isfile(datap):
@@ -145,7 +142,7 @@ class CkMinions(object):
             if not os.path.isdir(cdir):
                 return list(minions)
             for id_ in os.listdir(cdir):
-                if not id_ in minions:
+                if id_ not in minions:
                     continue
                 datap = os.path.join(cdir, id_, 'data.p')
                 if not os.path.isfile(datap):
@@ -248,13 +245,13 @@ class CkMinions(object):
         if v_matcher in infinite:
             # We can't be sure what the subset is, only match the identical
             # target
-            if not v_matcher == expr_form:
+            if v_matcher != expr_form:
                 return False
             return v_expr == expr
         v_minions = set(self.check_minions(v_expr, v_matcher))
         minions = set(self.check_minions(expr, expr_form))
-        d_bool = bool(minions.difference(v_minions))
-        if len(v_minions) == len(minions) and not d_bool:
+        d_bool = not bool(minions.difference(v_minions))
+        if len(v_minions) == len(minions) and d_bool:
             return True
         return d_bool
 
@@ -315,7 +312,7 @@ class CkMinions(object):
 
     def wheel_check(self, auth_list, fun):
         '''
-        Check special api permissions
+        Check special API permissions
         '''
         comps = fun.split('.')
         if len(comps) != 2:

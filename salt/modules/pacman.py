@@ -17,7 +17,7 @@ def __virtual__():
     '''
     Set the virtual pkg module if the os is Arch
     '''
-    return 'pkg' if __grains__['os'] == 'Arch' else False
+    return 'pkg' if __grains__['os'] in ('Arch', 'Arch ARM') else False
 
 
 def _list_removed(old, new):
@@ -95,7 +95,7 @@ def list_upgrades():
     '''
     upgrades = {}
     lines = __salt__['cmd.run'](
-        'pacman -Sypu --print-format "%n %v" | egrep -v "^\s|^:"'
+        'pacman -Sypu --print-format "%n %v" | egrep -v ' r'"^\s|^:"'
     ).splitlines()
     for line in lines:
         comps = line.split(' ')
@@ -239,7 +239,7 @@ def install(name=None,
             # Allow "version" to work for single package target
             pkg_params = {name: version}
         else:
-            log.warning('"version" parameter will be ignored for muliple '
+            log.warning('"version" parameter will be ignored for multiple '
                         'package targets')
 
     if pkg_type == 'file':

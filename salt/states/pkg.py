@@ -50,10 +50,21 @@ def __gen_rtag():
     return os.path.join(__opts__['cachedir'], 'pkg_refresh')
 
 
+def _fulfills_version_spec(versions, oper, desired_version):
+    '''
+    Returns True if any of the installed versions match the specified version,
+    otherwise returns False
+    '''
+    for ver in versions:
+        if __salt__['pkg.compare'](pkg1=ver, oper=oper, pkg2=desired_version):
+            return True
+    return False
+
+
 def _find_install_targets(name=None, version=None, pkgs=None, sources=None):
     '''
     Inspect the arguments to pkg.installed and discover what packages need to
-    be installed. Return a dict of desired packages, a dict of those
+    be installed. Return a dict of desired packages
     '''
     if all((pkgs, sources)):
         return {'name': name,
@@ -61,7 +72,7 @@ def _find_install_targets(name=None, version=None, pkgs=None, sources=None):
                 'result': False,
                 'comment': 'Only one of "pkgs" and "sources" is permitted.'}
 
-    cur_pkgs = __salt__['pkg.list_pkgs']()
+    cur_pkgs = __salt__['pkg.list_pkgs'](versions_as_list=True)
     if any((pkgs, sources)):
         if pkgs:
             desired = __salt__['pkg_resource.pack_pkgs'](pkgs)
@@ -80,14 +91,14 @@ def _find_install_targets(name=None, version=None, pkgs=None, sources=None):
     else:
         desired = {name: version}
 
-        cver = cur_pkgs.get(name, '')
-        if cver == version:
+        cver = cur_pkgs.get(name, [])
+        if version in cver:
             # The package is installed and is the correct version
             return {'name': name,
                     'changes': {},
                     'result': True,
-                    'comment': ('Package {0} is already installed and is the '
-                                'correct version').format(name)}
+                    'comment': ('Version {0} of package "{1}" is already '
+                                'installed').format(version, name)}
 
         # if cver is not an empty string, the package is already installed
         elif cver and version is None:
@@ -112,7 +123,7 @@ def _find_install_targets(name=None, version=None, pkgs=None, sources=None):
         targets = {}
         problems = []
         for pkgname, pkgver in desired.iteritems():
-            cver = cur_pkgs.get(pkgname, '')
+            cver = cur_pkgs.get(pkgname, [])
             # Package not yet installed, so add to targets
             if not cver:
                 targets[pkgname] = pkgver
@@ -130,12 +141,11 @@ def _find_install_targets(name=None, version=None, pkgs=None, sources=None):
                 gt_lt, eq, verstr = match.groups()
                 comparison = gt_lt or ''
                 comparison += eq or ''
-                # A comparison operator of "=" is redundant, but possbile.
+                # A comparison operator of "=" is redundant, but possible.
                 # Change it to "==" so that it works in pkg.compare.
                 if comparison in ['=', '']:
                     comparison = '=='
-                if not __salt__['pkg.compare'](pkg1=cver, oper=comparison,
-                                               pkg2=verstr):
+                if not _fulfills_version_spec(cver, comparison, verstr):
                     # Current version did not match desired, add to targets
                     targets[pkgname] = pkgver
 
@@ -176,11 +186,11 @@ def _verify_install(desired, new_pkgs):
         gt_lt, eq, verstr = match.groups()
         comparison = gt_lt or ''
         comparison += eq or ''
-        # A comparison operator of "=" is redundant, but possbile.
+        # A comparison operator of "=" is redundant, but possible.
         # Change it to "==" so that it works in pkg.compare.
         if comparison in ('=', ''):
             comparison = '=='
-        if __salt__['pkg.compare'](pkg1=cver, oper=comparison, pkg2=verstr):
+        if _fulfills_version_spec(cver, comparison, verstr):
             ok.append(pkgname)
         else:
             failed.append(pkgname)
@@ -292,7 +302,10 @@ def installed(
 
     sources
         A list of packages to install, along with the source URI or local path
-        from which to install each package.
+        from which to install each package. In the example below, ``foo``,
+        ``bar``, ``baz``, etc. refer to the name of the package, as it would
+        appear in the output of the ``pkg.version`` or ``pkg.list_pkgs`` salt
+        CLI commands.
 
     Usage::
 
@@ -336,8 +349,9 @@ def installed(
                 'result': None,
                 'comment': comment}
 
+    comment = []
     if refresh or os.path.isfile(rtag):
-        changes = __salt__['pkg.install'](name,
+        pkg_ret = __salt__['pkg.install'](name,
                                           refresh=True,
                                           version=version,
                                           fromrepo=fromrepo,
@@ -348,7 +362,7 @@ def installed(
         if os.path.isfile(rtag):
             os.remove(rtag)
     else:
-        changes = __salt__['pkg.install'](name,
+        pkg_ret = __salt__['pkg.install'](name,
                                           refresh=False,
                                           version=version,
                                           fromrepo=fromrepo,
@@ -356,17 +370,25 @@ def installed(
                                           pkgs=pkgs,
                                           sources=sources,
                                           **kwargs)
+    if isinstance(pkg_ret, dict):
+        changes = pkg_ret
+    elif isinstance(pkg_ret, basestring):
+        changes = {}
+        comment.append(pkg_ret)
+    else:
+        changes = {}
 
     if sources:
         modified = [x for x in changes.keys() if x in targets]
         not_modified = [x for x in desired if x not in targets]
         failed = [x for x in targets if x not in modified]
     else:
-        ok, failed = _verify_install(desired, __salt__['pkg.list_pkgs']())
+        ok, failed = \
+            _verify_install(desired,
+                            __salt__['pkg.list_pkgs'](versions_as_list=True))
         modified = [x for x in ok if x in targets]
         not_modified = [x for x in ok if x not in targets]
 
-    comment = []
     if modified:
         if sources:
             summary = ', '.join(modified)
@@ -664,9 +686,9 @@ def purged(name, **kwargs):
 def mod_init(low):
     '''
     Set a flag to tell the install functions to refresh the package database.
-    This ensures that the package database is refreshed only once durring
-    a state run significaltly improving the speed of package management
-    durring a state run.
+    This ensures that the package database is refreshed only once during
+    a state run significantly improving the speed of package management
+    during a state run.
 
     It sets a flag for a number of reasons, primarily due to timeline logic.
     When originally setting up the mod_init for pkg a number of corner cases

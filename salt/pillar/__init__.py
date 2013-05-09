@@ -78,6 +78,17 @@ class Pillar(object):
         self.rend = salt.loader.render(self.opts, self.functions)
         self.ext_pillars = salt.loader.pillars(self.opts, self.functions)
 
+    def __valid_ext(self, ext):
+        '''
+        Check to see if the on demand external pillar is allowed
+        '''
+        if not isinstance(ext, dict):
+            return {}
+        valid = set(('libvirt',))
+        if any(key not in valid for key in ext):
+            return {}
+        return ext
+
     def __gen_opts(self, opts_in, grains, id_, env=None, ext=None):
         '''
         The options need to be altered to conform to the file client
@@ -95,7 +106,7 @@ class Pillar(object):
             opts['state_top'] = os.path.join('salt://', opts['state_top'][1:])
         else:
             opts['state_top'] = os.path.join('salt://', opts['state_top'])
-        if ext:
+        if self.__valid_ext(ext):
             if 'ext_pillar'  in opts:
                 opts['ext_pillar'].append(ext)
             else:
@@ -154,7 +165,7 @@ class Pillar(object):
         # Search initial top files for includes
         for env, ctops in tops.items():
             for ctop in ctops:
-                if not 'include' in ctop:
+                if 'include' not in ctop:
                     continue
                 for sls in ctop['include']:
                     include[env].append(sls)
@@ -197,13 +208,13 @@ class Pillar(object):
         Cleanly merge the top files
         '''
         top = collections.defaultdict(dict)
-        for sourceenv, ctops in tops.items():
+        for ctops in tops.values():
             for ctop in ctops:
                 for env, targets in ctop.items():
                     if env == 'include':
                         continue
                     for tgt in targets:
-                        if not tgt in top[env]:
+                        if tgt not in top[env]:
                             top[env][tgt] = ctop[env][tgt]
                             continue
                         matches = []
@@ -235,7 +246,7 @@ class Pillar(object):
         matches = {}
         for env, body in top.items():
             if self.opts['environment']:
-                if not env == self.opts['environment']:
+                if env != self.opts['environment']:
                     continue
             for match, data in body.items():
                 if self.matcher.confirm_top(
@@ -366,5 +377,5 @@ class Pillar(object):
         if errors:
             for error in errors:
                 log.critical('Pillar render error: {0}'.format(error))
-            return {}
+            pillar['_errors'] = errors
         return pillar

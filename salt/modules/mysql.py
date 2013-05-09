@@ -158,7 +158,7 @@ def query(database, query):
     # into Python objects. It leaves them as strings.
     orig_conv = MySQLdb.converters.conversions
     conv_iter = iter(orig_conv)
-    conv = dict(zip(conv_iter,[str,] * len(orig_conv.keys())))
+    conv = dict(zip(conv_iter, [str,] * len(orig_conv.keys())))
 
     ret = {}
     dbc = _connect(**{'db': database, 'conv': conv})
@@ -256,7 +256,7 @@ def free_slave():
 
     CLI Example::
 
-        salt \* mysql.free_slave
+        salt '*' mysql.free_slave
     '''
     slave_db = _connect()
     slave_cur = slave_db.cursor(MySQLdb.cursors.DictCursor)
@@ -367,7 +367,7 @@ def db_create(name):
         log.info('DB \'{0}\' already exists'.format(name))
         return False
 
-    # db doesnt exist, proceed
+    # db doesn't exist, proceed
     dbc = _connect()
     cur = dbc.cursor()
     query = 'CREATE DATABASE `{0}`;'.format(name)
@@ -395,7 +395,7 @@ def db_remove(name):
         log.info('DB \'{0}\' may not be removed'.format(name))
         return False
 
-    # db doesnt exist, proceed
+    # db doesn't exist, proceed
     dbc = _connect()
     cur = dbc.cursor()
     query = 'DROP DATABASE `{0}`;'.format(name)
@@ -717,7 +717,7 @@ def grant_exists(grant,
 
     CLI Example::
 
-        salt \* mysql.grant_exists 'SELECT,INSERT,UPDATE,...' 'database.*' 'frank' 'localhost'
+        salt '*' mysql.grant_exists 'SELECT,INSERT,UPDATE,...' 'database.*' 'frank' 'localhost'
     '''
     # TODO: This function is a bit tricky, since it requires the ordering to
     #       be exactly the same. Perhaps should be replaced/reworked with a
@@ -903,7 +903,7 @@ def __do_query_into_hash(conn, sql_str):
 
 def get_master_status():
     '''
-    Retrieves the master status from the mimion.
+    Retrieves the master status from the minion.
 
     Returns:
         {'host.domain.com': {'Binlog_Do_DB': '',

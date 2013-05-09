@@ -55,7 +55,7 @@ def _parser(result):
 
 def cpu():
     '''
-    Tests for the cpu performance of minions.
+    Tests for the CPU performance of minions.
 
     CLI Examples::
 
@@ -86,7 +86,7 @@ def threads():
 
     CLI Example::
 
-        salt \* sysbench.threads
+        salt '*' sysbench.threads
     '''
 
     # Test data
@@ -115,7 +115,7 @@ def mutex():
 
     CLI Examples::
 
-        salt \* sysbench.mutex
+        salt '*' sysbench.mutex
     '''
 
     # Test options and the values they take
@@ -152,7 +152,7 @@ def memory():
 
     CLI Examples::
 
-        salt \* sysbench.memory
+        salt '*' sysbench.memory
     '''
 
     # test defaults
@@ -199,7 +199,7 @@ def fileio():
 
     CLI Examples::
 
-        salt \* sysbench.fileio
+        salt '*' sysbench.fileio
     '''
 
     # Test data

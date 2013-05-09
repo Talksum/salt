@@ -3,6 +3,7 @@ Resources needed by pkg providers
 '''
 
 # Import python libs
+import fnmatch
 import os
 import re
 import yaml
@@ -29,17 +30,17 @@ def _parse_pkg_meta(path):
         if result['retcode'] == 0:
             for line in result['stdout'].splitlines():
                 if not name:
-                    match = re.match('^Name\s*:\s*(\S+)', line)
+                    match = re.match(r'^Name\s*:\s*(\S+)', line)
                     if match:
                         name = match.group(1)
                         continue
                 if not version:
-                    match = re.match('^Version\s*:\s*(\S+)', line)
+                    match = re.match(r'^Version\s*:\s*(\S+)', line)
                     if match:
                         version = match.group(1)
                         continue
                 if not rel:
-                    match = re.match('^Release\s*:\s*(\S+)', line)
+                    match = re.match(r'^Release\s*:\s*(\S+)', line)
                     if match:
                         rel = match.group(1)
                         continue
@@ -54,12 +55,12 @@ def _parse_pkg_meta(path):
         if result['retcode'] == 0:
             for line in result['stdout'].splitlines():
                 if not name:
-                    match = re.match('^Name\s*:\s*(\S+)', line)
+                    match = re.match(r'^Name\s*:\s*(\S+)', line)
                     if match:
                         name = match.group(1)
                         continue
                 if not version:
-                    match = re.match('^Version\s*:\s*(\S+)', line)
+                    match = re.match(r'^Version\s*:\s*(\S+)', line)
                     if match:
                         version = match.group(1)
                         continue
@@ -72,12 +73,12 @@ def _parse_pkg_meta(path):
         if result['retcode'] == 0:
             for line in result['stdout'].splitlines():
                 if not name:
-                    match = re.match('^\s*Package\s*:\s*(\S+)', line)
+                    match = re.match(r'^\s*Package\s*:\s*(\S+)', line)
                     if match:
                         name = match.group(1)
                         continue
                 if not version:
-                    match = re.match('^\s*Version\s*:\s*(\S+)', line)
+                    match = re.match(r'^\s*Version\s*:\s*(\S+)', line)
                     if match:
                         version = match.group(1)
                         continue
@@ -275,7 +276,7 @@ def parse_targets(name=None, pkgs=None, sources=None):
         srcinfo = []
         for pkg_name, pkg_src in sources.iteritems():
             if __salt__['config.valid_fileproto'](pkg_src):
-                # Cache package from remote source (salt master, http, ftp)
+                # Cache package from remote source (salt master, HTTP, FTP)
                 srcinfo.append((pkg_name,
                                 pkg_src,
                                __salt__['cp.cache_file'](pkg_src),
@@ -310,24 +311,36 @@ def parse_targets(name=None, pkgs=None, sources=None):
 
 def version(*names, **kwargs):
     '''
-    Common interface for obtaining the version of installed packages
+    Common interface for obtaining the version of installed packages.
 
     CLI Example::
 
         salt '*' pkg_resource.version vim
+        salt '*' pkg_resource.version foo bar baz
+        salt '*' pkg_resource.version 'python*'
     '''
     ret = {}
     versions_as_list = \
         salt.utils.is_true(kwargs.get('versions_as_list'))
+    pkg_glob = False
     if len(names) != 0:
         pkgs = __salt__['pkg.list_pkgs'](versions_as_list=True)
         for name in names:
-            ret[name] = pkgs.get(name, [])
+            if '*' in name:
+                pkg_glob = True
+                for match in fnmatch.filter(pkgs.keys(), name):
+                    ret[match] = pkgs.get(match, [])
+            else:
+                ret[name] = pkgs.get(name, [])
     if not versions_as_list:
         __salt__['pkg_resource.stringify'](ret)
-    # Return a single value if only one package name was passed
-    if len(names) == 1:
-        return ret[names[0]]
+    # Return a string if no globbing is used, and there is one item in the
+    # return dict
+    if len(ret) == 1 and not pkg_glob:
+        try:
+            return ret.values()[0]
+        except IndexError:
+            return ''
     return ret
 
 

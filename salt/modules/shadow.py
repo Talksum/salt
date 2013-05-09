@@ -15,7 +15,7 @@ import salt.utils
 
 def __virtual__():
     '''
-    Only work on posix-like systems
+    Only work on POSIX-like systems
     '''
 
     # Disable on Windows, a specific file module exists:
@@ -113,11 +113,11 @@ def set_mindays(name, mindays):
     return False
 
 
-def set_password(name, password):
+def set_password(name, password, use_usermod=False):
     '''
     Set the password for a named user. The password must be a properly defined
     hash, the password hash can be generated with this command:
-    ``python -c "import crypt, getpass, pwd; print crypt.crypt('password', '\$6\$SALTsalt\$')"``
+    ``python -c "import crypt, getpass, pwd; print crypt.crypt('password', '\\$6\\$SALTsalt\\$')"``
     Keep in mind that the $6 represents a sha512 hash, if your OS is using a
     different hashing algorithm this needs to be changed accordingly
 
@@ -125,24 +125,32 @@ def set_password(name, password):
 
         salt '*' shadow.set_password root $1$UYCIxa628.9qXjpQCjM4a..
     '''
-    s_file = '/etc/shadow'
-    ret = {}
-    if not os.path.isfile(s_file):
-        return ret
-    lines = []
-    with salt.utils.fopen(s_file, 'rb') as fp_:
-        for line in fp_:
-            comps = line.strip().split(':')
-            if not comps[0] == name:
-                lines.append(line)
-                continue
-            comps[1] = password
-            line = ':'.join(comps)
-            lines.append('{0}\n'.format(line))
-    with salt.utils.fopen(s_file, 'w+') as fp_:
-        fp_.writelines(lines)
-    uinfo = info(name)
-    return uinfo['pwd'] == password
+    if not use_usermod:
+        # Edit the shadow file directly
+        s_file = '/etc/shadow'
+        ret = {}
+        if not os.path.isfile(s_file):
+            return ret
+        lines = []
+        with salt.utils.fopen(s_file, 'rb') as fp_:
+            for line in fp_:
+                comps = line.strip().split(':')
+                if comps[0] != name:
+                    lines.append(line)
+                    continue
+                comps[1] = password
+                line = ':'.join(comps)
+                lines.append('{0}\n'.format(line))
+        with salt.utils.fopen(s_file, 'w+') as fp_:
+            fp_.writelines(lines)
+        uinfo = info(name)
+        return uinfo['pwd'] == password
+    else:
+        # Use usermod -p (less secure, but more feature-complete)
+        cmd = 'usermod -p {0} {1}'.format(name, password)
+        __salt__['cmd.run'](cmd)
+        uinfo = info(name)
+        return uinfo['pwd'] == password
 
 
 def set_warndays(name, warndays):

@@ -3,8 +3,31 @@ Manage and query NPM packages.
 '''
 
 import json
+import distutils.version
+
+# Import salt libs
+import salt.utils
 
 from salt.exceptions import CommandExecutionError
+
+def __virtual__():
+    '''
+    Only work when npm is installed.
+    '''
+    if salt.utils.which('npm'):
+        return 'npm'
+    return False
+
+def _valid_version():
+    '''
+    Check the version of npm to ensure this module will work. Currently
+    npm must be at least version 1.2.
+    '''
+    npm_version = distutils.version.LooseVersion(
+        __salt__['cmd.run']('npm --version'))
+    valid_version = distutils.version.LooseVersion('1.2')
+    return npm_version >= valid_version
+
 
 def install(pkg=None,
             dir=None,
@@ -31,7 +54,10 @@ def install(pkg=None,
         salt '*' npm.install coffee-script
 
     '''
-    cmd = 'npm install --json'
+    if not _valid_version():
+        return '"{0}" is not available.'.format('npm.install')
+
+    cmd = 'npm install --silent --json'
 
     if dir is None:
         cmd += ' --global'
@@ -44,12 +70,29 @@ def install(pkg=None,
     if result['retcode'] != 0:
         raise CommandExecutionError(result['stderr'])
 
+    try:
+        return json.loads(result['stdout'])
+    except ValueError:
+        # Not JSON! Try to coax the json out of it!
+        pass
+
     lines = result['stdout'].splitlines()
 
     while ' -> ' in lines[0]:
         lines = lines[1:]
 
-    return json.loads(''.join(lines))
+    # Strip all lines until JSON output starts
+    for i in lines:
+        if i.startswith("{"):
+            break
+        else:
+            lines = lines[1:]        
+
+    try:
+        return json.loads(''.join(lines))
+    except ValueError:
+        # Still no JSON!! Return the stdout as a string
+        return result['stdout']
 
 def uninstall(pkg,
               dir=None,
@@ -74,6 +117,9 @@ def uninstall(pkg,
         salt '*' npm.uninstall coffee-script
 
     '''
+    if not _valid_version():
+        return '"{0}" is not available.'.format('npm.uninstall')
+
     cmd = 'npm uninstall'
 
     if dir is None:
@@ -106,6 +152,9 @@ def list(pkg=None,
         salt '*' npm.list
 
     '''
+    if not _valid_version():
+        return '"{0}" is not available.'.format('npm.list')
+
     cmd = 'npm list --json'
 
     if dir is None:
