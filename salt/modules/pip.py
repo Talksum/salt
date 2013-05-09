@@ -43,6 +43,26 @@ def _get_pip_bin(bin_env):
     return bin_env
 
 
+def _get_cached_requirements(requirements):
+    """Get the location of a cached requirements file; caching if necessary."""
+    cached_requirements = __salt__['cp.is_cached'](
+        requirements, __env__
+    )
+    if not cached_requirements:
+        # It's not cached, let's cache it.
+        cached_requirements = __salt__['cp.cache_file'](
+            requirements, __env__
+        )
+    # Check if the master version has changed.
+    if __salt__['cp.hash_file'](requirements, __env__) != \
+            __salt__['cp.hash_file'](cached_requirements, __env__):
+        cached_requirements = __salt__['cp.cache_file'](
+            requirements, __env__
+        )
+
+    return cached_requirements
+
+
 def install(pkgs=None,
             requirements=None,
             env=None,
@@ -69,6 +89,7 @@ def install(pkgs=None,
             no_download=False,
             install_options=None,
             runas=None,
+            no_chown=False,
             cwd=None,
             __env__='base'):
     '''
@@ -147,6 +168,9 @@ def install(pkgs=None,
         path, be sure to use absolute path.
     runas
         User to run pip as
+    no_chown
+        When runas is given, do not attempt to copy and chown
+        a requirements file
     cwd
         Current working directory to run pip from
 
@@ -189,20 +213,7 @@ def install(pkgs=None,
     treq = None
     if requirements:
         if requirements.startswith('salt://'):
-            cached_requirements = __salt__['cp.is_cached'](
-                requirements, __env__
-            )
-            if not cached_requirements:
-                # It's not cached, let's cache it.
-                cached_requirements = __salt__['cp.cache_file'](
-                    requirements, __env__
-                )
-            # Check if the master version has changed.
-            if __salt__['cp.hash_file'](requirements, __env__) != \
-                    __salt__['cp.hash_file'](cached_requirements, __env__):
-                cached_requirements = __salt__['cp.cache_file'](
-                    requirements, __env__
-                )
+            cached_requirements = _get_cached_requirements(requirements)
             if not cached_requirements:
                 return {
                     'result': False,
@@ -212,10 +223,9 @@ def install(pkgs=None,
                         )
                     )
                 }
-
             requirements = cached_requirements
 
-        if runas:
+        if runas and not no_chown:
             # Need to make a temporary copy since the runas user will, most
             # likely, not have the right permissions to read the file
             treq = salt.utils.mkstemp()

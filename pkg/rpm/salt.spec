@@ -5,10 +5,12 @@
 %define pybasever 2.7
 %define __python %{_bindir}/python%{?pybasever}
 
+%global include_tests 0
+
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 
 Name: salt
-Version: 0.15.0
+Version: 0.15.1
 Release: 1%{?dist}
 Summary: A parallel remote execution system
 
@@ -200,9 +202,15 @@ rm -rf $RPM_BUILD_ROOT
   fi
 
 %changelog
+* Wed May 8 2013 Clint Savage <herlo1@gmail.com> - 0.15.1-1
+- Update to patch release 0.15.1
+
 * Mon May 06 2013 Mike Chesnut <mikec@talksum.com> - 0.15.0-1
 - move to latest git head to get features from 0.15.0 release
 - add new talkos-salt scripts as part of TALK-424
+
+* Sat May 4 2013 Clint Savage <herlo1@gmail.com> - 0.15.0-1
+- Update to upstream feature release 0.15.0
 
 * Fri Apr 19 2013 Clint Savage <herlo1@gmail.com> - 0.14.1-1
 - Update to upstream patch release 0.14.1

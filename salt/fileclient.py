@@ -19,7 +19,6 @@ from salt.exceptions import MinionError, SaltReqTimeoutError
 import salt.client
 import salt.crypt
 import salt.loader
-import salt.utils
 import salt.payload
 import salt.utils
 import salt.utils.templates
@@ -502,7 +501,7 @@ class LocalClient(Client):
         ret['hash_type'] = self.opts['hash_type']
         return ret
 
-    def list_env(self, path, env='base'):
+    def list_env(self, env='base'):
         '''
         Return a list of the files in the file server's specified environment
         '''
@@ -717,7 +716,7 @@ class RemoteClient(Client):
         except SaltReqTimeoutError:
             return ''
 
-    def list_env(self, path, env='base'):
+    def list_env(self, env='base'):
         '''
         Return a list of the files in the file server's specified environment
         '''

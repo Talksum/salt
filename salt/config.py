@@ -471,13 +471,13 @@ def apply_minion_config(overrides=None, check_dns=True, defaults=None):
     if '__mine_interval' not in opts.get('schedule', {}):
         if not 'schedule' in opts:
             opts['schedule'] = {}
-        opts['schedule'] = {
+        opts['schedule'].update({
                 '__mine_interval':
                 {
                     'function': 'mine.update',
                     'minutes': opts['mine_interval']
                     }
-                }
+                })
     return opts
 
 
@@ -558,7 +558,7 @@ def apply_master_config(overrides=None, defaults=None):
                 # serialization)
                 re.compile(regex)
                 opts['file_ignore_regex'].append(regex)
-            except:
+            except Exception:
                 log.warning(
                     'Unable to parse file_ignore_regex. Skipping: {0}'.format(
                         regex
