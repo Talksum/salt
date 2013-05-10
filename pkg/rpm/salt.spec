@@ -11,7 +11,7 @@
 
 Name: salt
 Version: 0.15.1
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: A parallel remote execution system
 
 Group:   System Environment/Daemons
@@ -183,11 +183,15 @@ rm -rf $RPM_BUILD_ROOT
   fi
 
 %post master
-  /sbin/chkconfig --add salt-master
-  /sbin/chkconfig --add salt-syndic
+  if [ $1 -eq 1 ] ; then
+      /sbin/chkconfig --add salt-master
+      /sbin/chkconfig --add salt-syndic
+  fi
 
 %post minion
-  /sbin/chkconfig --add salt-minion
+  if [ $1 -eq 1 ] ; then
+      /sbin/chkconfig --add salt-minion
+  fi
 
 %postun master
   if [ "$1" -ge "1" ] ; then
@@ -202,6 +206,9 @@ rm -rf $RPM_BUILD_ROOT
   fi
 
 %changelog
+* Thu May 09 2013 Mike Chesnut <mikec@talksum.com> - 0.15.1-2
+- change %post scripts to only chkconfig on for new installs (not upgrades)
+
 * Wed May 8 2013 Clint Savage <herlo1@gmail.com> - 0.15.1-1
 - Update to patch release 0.15.1
 
