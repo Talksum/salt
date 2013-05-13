@@ -33,6 +33,7 @@ except ImportError:
     HAS_FNCTL = False
 
 # Import salt libs
+import salt.log
 import salt.minion
 import salt.payload
 from salt.exceptions import (
@@ -190,7 +191,7 @@ def daemonize():
     #os.dup2(dev_null.fileno(), sys.stderr.fileno())
 
 
-def daemonize_if(opts, **kwargs):
+def daemonize_if(opts):
     '''
     Daemonize a module function process if multiprocessing is True and the
     process is not being called by salt-call
@@ -243,13 +244,13 @@ def which(exe=None):
             full_path = os.path.join(path, exe)
             if os.access(full_path, os.X_OK):
                 return full_path
-        log.info(
+        log.trace(
             '{0!r} could not be found in the following search '
             'path: {1!r}'.format(
                 exe, search_path
             )
         )
-    log.debug('No executable was passed to be searched by which')
+    log.trace('No executable was passed to be searched by which')
     return None
 
 
@@ -339,8 +340,9 @@ def dns_check(addr, safe=False, ipv6=False):
     '''
     error = False
     try:
-        hostnames = socket.getaddrinfo(addr, None, socket.AF_UNSPEC,
-                                       socket.SOCK_STREAM)
+        hostnames = socket.getaddrinfo(
+            addr, None, socket.AF_UNSPEC, socket.SOCK_STREAM
+        )
         if not hostnames:
             error = True
         else:
@@ -351,7 +353,7 @@ def dns_check(addr, safe=False, ipv6=False):
                     break
             if not addr:
                 error = True
-    except socket.gaierror:
+    except socket.error:
         error = True
 
     if error:
@@ -359,17 +361,13 @@ def dns_check(addr, safe=False, ipv6=False):
                'but now fails to resolve! The previously resolved ip addr '
                'will continue to be used').format(addr)
         if safe:
-            import salt.log
             if salt.log.is_console_configured():
                 # If logging is not configured it also means that either
                 # the master or minion instance calling this hasn't even
                 # started running
-                logging.getLogger(__name__).error(err)
+                log.error(err)
             raise SaltClientError()
-        else:
-            err = err.format(addr)
-            sys.stderr.write(err)
-            sys.exit(42)
+        raise SaltSystemExit(code=42, msg=err)
     return addr
 
 

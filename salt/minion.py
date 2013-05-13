@@ -130,10 +130,13 @@ def detect_kwargs(func, args, data=None):
         if isinstance(arg, string_types):
             if '=' in arg:
                 comps = arg.split('=')
-                if has_kwargs:
+                if ' ' in comps[0]:
+                    # Invalid kwarg
+                    pass
+                elif has_kwargs:
                     kwargs[comps[0]] = '='.join(comps[1:])
                     continue
-                if comps[0] in kwarg_spec:
+                elif comps[0] in kwarg_spec:
                     kwargs[comps[0]] = '='.join(comps[1:])
                     continue
         _args.append(arg)
@@ -159,8 +162,25 @@ class SMinion(object):
         opts['grains'] = salt.loader.grains(opts)
         self.opts = opts
         if self.opts.get('file_client', 'remote') == 'remote':
-            self.opts.update(resolve_dns(opts))
-        self.gen_modules()
+            if isinstance(self.opts['master'], list):
+                masters = self.opts['master']
+                self.opts['_auth_timeout'] = 3
+                self.opts['_safe_auth'] = False
+                for master in masters:
+                    self.opts['master'] = master
+                    self.opts.update(resolve_dns(opts))
+                    try:
+                        self.gen_modules()
+                        break
+                    except SaltClientError:
+                        log.warning(('Attempted to authenticate with master '
+                                     '{0} and failed'.format(master)))
+                        continue
+            else:
+                self.opts.update(resolve_dns(opts))
+                self.gen_modules()
+        else:
+            self.gen_modules()
 
     def gen_modules(self):
         '''
@@ -563,7 +583,7 @@ class Minion(object):
             minion_instance = cls(opts)
         if opts['multiprocessing']:
             fn_ = os.path.join(minion_instance.proc_dir, data['jid'])
-            salt.utils.daemonize_if(opts, **data)
+            salt.utils.daemonize_if(opts)
             sdata = {'pid': os.getpid()}
             sdata.update(data)
             with salt.utils.fopen(fn_, 'w+') as fp_:
